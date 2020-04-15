@@ -3814,3 +3814,19 @@ def go_repositories():
         sum = "h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=",
         version = "v1.0.0",
     )
+    go_repository(
+        name = "com_gitee_openeuler_go-gitee",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "gitee.com/openeuler/go-gitee",
+        sum = "h1:uakoqruiLVLw8UphAQWbu1L4wEUq4cbt+sK7WxrNeVw=",
+        version = "v0.0.0-20200407034142-9d0d3521129a",
+    )
+    go_repository(
+        name = "com_github_antihax_optional",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/antihax/optional",
+        sum = "h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=",
+        version = "v1.0.0",
+    )
