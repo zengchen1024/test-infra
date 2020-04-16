@@ -17,6 +17,10 @@ type ConfigAgent struct {
 	pcb map[string]PluginConfigBuilder
 }
 
+func NewConfigAgent() *ConfigAgent {
+	return &ConfigAgent{pcb: map[string]PluginConfigBuilder{}}
+}
+
 func (ca *ConfigAgent) Load(path string, checkUnknownPlugins bool, knownPlugins map[string]HelpProvider) error {
 	pcs := make(map[string]PluginConfig)
 	for n, b := range ca.pcb {

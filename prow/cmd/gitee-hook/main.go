@@ -124,7 +124,7 @@ func main() {
 		logrus.WithError(err).Fatal("Error starting secrets agent.")
 	}
 
-	pluginAgent := &plugins.ConfigAgent{}
+	pluginAgent := plugins.NewConfigAgent()
 	if err := pluginAgent.Load(o.pluginConfig, false, nil); err != nil {
 		logrus.WithError(err).Fatal("Error loading plugins config.")
 	}
@@ -148,7 +148,10 @@ func main() {
 	metrics.ExposeMetrics("gitee-hook", configAgent.Config().PushGateway)
 	pjutil.ServePProf()
 
-	server := hook.NewServer(pluginAgent, pm, originh.NewMetrics(), secretAgent.GetTokenGenerator(o.webhookSecretFile))
+	vf := func(w http.ResponseWriter, r *http.Request) (string, string, []byte, bool, int) {
+		return gitee.ValidateWebhook(w, r, secretAgent.GetTokenGenerator(o.webhookSecretFile))
+	}
+	server := hook.NewServer(pluginAgent, pm, originh.NewMetrics(), vf)
 
 	interrupts.OnInterrupt(func() {
 		server.GracefulShutdown()

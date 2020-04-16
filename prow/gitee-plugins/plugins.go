@@ -58,7 +58,17 @@ type Plugins interface {
 }
 
 func NewPluginManager() Plugins {
-	return &plugins{}
+	return &plugins{
+		pluginHelp:                 map[string]HelpProvider{},
+		genericCommentHandlers:     map[string]GenericCommentHandler{},
+		issueHandlers:              map[string]IssueHandler{},
+		issueCommentHandlers:       map[string]IssueCommentHandler{},
+		pullRequestHandlers:        map[string]PullRequestHandler{},
+		pushEventHandlers:          map[string]PushEventHandler{},
+		reviewEventHandlers:        map[string]ReviewEventHandler{},
+		reviewCommentEventHandlers: map[string]ReviewCommentEventHandler{},
+		statusEventHandlers:        map[string]StatusEventHandler{},
+	}
 }
 
 type plugins struct {

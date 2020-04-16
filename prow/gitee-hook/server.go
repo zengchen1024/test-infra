@@ -35,29 +35,35 @@ type Server interface {
 	GracefulShutdown()
 }
 
+// ValidateWebhook ensures that the provided request conforms to the
+// format of a webhook such as GitHub and the payload can be validated with
+// the provided hmac secret. It returns the event type, the event guid,
+// the payload of the request, whether the webhook is valid or not,
+// and finally the resultant HTTP status code
+type ValidateWebhook func(http.ResponseWriter, *http.Request) (string, string, []byte, bool, int)
+
 // Server implements http.Handler. It validates incoming GitHub webhooks and
 // then dispatches them to the appropriate plugins.
 type server struct {
-	plugins        plugins
-	tokenGenerator func() []byte
-	metrics        *originh.Metrics
+	plugins plugins
+	vwh     ValidateWebhook
+	metrics *originh.Metrics
 
 	// Tracks running handlers for graceful shutdown
 	wg sync.WaitGroup
 }
 
-func NewServer(c *pm.ConfigAgent, ps pm.Plugins, m *originh.Metrics, tg func() []byte) Server {
+func NewServer(c *pm.ConfigAgent, ps pm.Plugins, m *originh.Metrics, v ValidateWebhook) Server {
 	return &server{
-		plugins:        plugins{c: c, ps: ps},
-		tokenGenerator: tg,
-		metrics:        m,
+		plugins: plugins{c: c, ps: ps},
+		vwh:     v,
+		metrics: m,
 	}
 }
 
 // ServeHTTP validates an incoming webhook and puts it into the event channel.
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	eventType, eventGUID, payload, ok, resp := github.ValidateWebhook(w, r, s.tokenGenerator)
-
+	eventType, eventGUID, payload, ok, resp := s.vwh(w, r)
 	if counter, err := s.metrics.ResponseCounter.GetMetricWithLabelValues(strconv.Itoa(resp)); err != nil {
 		logrus.WithFields(logrus.Fields{
 			"status-code": resp,
