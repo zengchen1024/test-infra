@@ -151,7 +151,7 @@ func main() {
 	vf := func(w http.ResponseWriter, r *http.Request) (string, string, []byte, bool, int) {
 		return gitee.ValidateWebhook(w, r, secretAgent.GetTokenGenerator(o.webhookSecretFile))
 	}
-	server := hook.NewServer(pluginAgent, pm, originh.NewMetrics(), vf)
+	server := hook.NewServer(originh.NewMetrics(), vf, plugins.NewDispatcher(pluginAgent, pm))
 
 	interrupts.OnInterrupt(func() {
 		server.GracefulShutdown()

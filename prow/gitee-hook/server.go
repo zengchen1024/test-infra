@@ -17,15 +17,12 @@ limitations under the License.
 package hook
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/sirupsen/logrus"
 
-	pm "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/github"
 	originh "k8s.io/test-infra/prow/hook"
 )
@@ -33,6 +30,11 @@ import (
 type Server interface {
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 	GracefulShutdown()
+}
+
+type Dispatcher interface {
+	GracefulShutdown()
+	Dispatch(eventType, eventGUID string, payload []byte) error
 }
 
 // ValidateWebhook ensures that the provided request conforms to the
@@ -45,19 +47,17 @@ type ValidateWebhook func(http.ResponseWriter, *http.Request) (string, string, [
 // Server implements http.Handler. It validates incoming GitHub webhooks and
 // then dispatches them to the appropriate plugins.
 type server struct {
-	plugins plugins
 	vwh     ValidateWebhook
 	metrics *originh.Metrics
 
-	// Tracks running handlers for graceful shutdown
-	wg sync.WaitGroup
+	dispatcher Dispatcher
 }
 
-func NewServer(c *pm.ConfigAgent, ps pm.Plugins, m *originh.Metrics, v ValidateWebhook) Server {
+func NewServer(m *originh.Metrics, v ValidateWebhook, d Dispatcher) Server {
 	return &server{
-		plugins: plugins{c: c, ps: ps},
-		vwh:     v,
-		metrics: m,
+		dispatcher: d,
+		vwh:        v,
+		metrics:    m,
 	}
 }
 
@@ -85,7 +85,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *server) demuxEvent(eventType, eventGUID string, payload []byte, h http.Header) error {
 	l := logrus.WithFields(
 		logrus.Fields{
-			eventTypeField:   eventType,
+			"event-type":   eventType,
 			github.EventGUID: eventGUID,
 		},
 	)
@@ -95,72 +95,12 @@ func (s *server) demuxEvent(eventType, eventGUID string, payload []byte, h http.
 	} else {
 		counter.Inc()
 	}
-	switch eventType {
-	case "issues":
-		var i github.IssueEvent
-		if err := json.Unmarshal(payload, &i); err != nil {
-			return err
-		}
-		i.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handleIssueEvent(l, i)
-	case "issue_comment":
-		var ic github.IssueCommentEvent
-		if err := json.Unmarshal(payload, &ic); err != nil {
-			return err
-		}
-		ic.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handleIssueCommentEvent(l, ic)
-	case "pull_request":
-		var pr github.PullRequestEvent
-		if err := json.Unmarshal(payload, &pr); err != nil {
-			return err
-		}
-		pr.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handlePullRequestEvent(l, pr)
-	case "pull_request_review":
-		var re github.ReviewEvent
-		if err := json.Unmarshal(payload, &re); err != nil {
-			return err
-		}
-		re.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handleReviewEvent(l, re)
-	case "pull_request_review_comment":
-		var rce github.ReviewCommentEvent
-		if err := json.Unmarshal(payload, &rce); err != nil {
-			return err
-		}
-		rce.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handleReviewCommentEvent(l, rce)
-	case "push":
-		var pe github.PushEvent
-		if err := json.Unmarshal(payload, &pe); err != nil {
-			return err
-		}
-		pe.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handlePushEvent(l, pe)
-	case "status":
-		var se github.StatusEvent
-		if err := json.Unmarshal(payload, &se); err != nil {
-			return err
-		}
-		se.GUID = eventGUID
-		s.wg.Add(1)
-		go s.handleStatusEvent(l, se)
-	default:
-		l.Debug("Ignoring unhandled event type. (Might still be handled by external plugins.)")
-	}
-	return nil
+
+	return s.dispatcher.Dispatch(eventType, eventGUID, payload)
 }
 
 // GracefulShutdown implements a graceful shutdown protocol. It handles all requests sent before
 // receiving the shutdown signal.
 func (s *server) GracefulShutdown() {
-	s.wg.Wait() // Handle remaining requests
-	return
+	s.dispatcher.GracefulShutdown()
 }

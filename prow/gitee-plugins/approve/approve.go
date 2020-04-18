@@ -3,9 +3,10 @@ package approve
 import (
 	"fmt"
 
+	"gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	prowConfig "k8s.io/test-infra/prow/config"
-	"k8s.io/test-infra/prow/gitee-plugins"
+	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
 	originp "k8s.io/test-infra/prow/plugins"
@@ -85,19 +86,14 @@ func (a *approve) NewPluginConfig() plugins.PluginConfig {
 
 func (a *approve) RegisterEventHandler(p plugins.Plugins) {
 	name := a.PluginName()
-	p.RegisterGenericCommentHandler(name, a.handleGenericCommentEvent)
-	p.RegisterReviewEventHandler(name, a.handleReviewEvent)
+	p.RegisterNoteEventHandler(name, a.handleNoteEvent)
 	p.RegisterPullRequestHandler(name, a.handlePullRequestEvent)
 }
 
-func (a *approve) handleGenericCommentEvent(e *github.GenericCommentEvent, log *logrus.Entry) error {
+func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
 	return nil
 }
 
-func (a *approve) handleReviewEvent(e *github.ReviewEvent, log *logrus.Entry) error {
-	return nil
-}
-
-func (a *approve) handlePullRequestEvent(e *github.PullRequestEvent, log *logrus.Entry) error {
+func (a *approve) handlePullRequestEvent(e *gitee.PullRequestEvent, log *logrus.Entry) error {
 	return nil
 }
