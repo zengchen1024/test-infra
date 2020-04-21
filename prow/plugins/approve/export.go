@@ -9,7 +9,7 @@ import (
 )
 
 func Handle(log *logrus.Entry, ghc githubClient, repo approvers.Repo, githubConfig config.GitHubOptions, opts *plugins.Approve, pr *state) error {
-	return Handle(log, ghc, repo, githubConfig, opts, pr)
+	return handle(log, ghc, repo, githubConfig, opts, pr)
 }
 
 func NewState(org, repo, branch, body, author, url string, number int, assignees []github.User) *state {

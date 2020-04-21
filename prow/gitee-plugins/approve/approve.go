@@ -3,6 +3,9 @@ package approve
 import (
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
+	"time"
 
 	"gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
@@ -13,6 +16,11 @@ import (
 	originp "k8s.io/test-infra/prow/plugins"
 	origina "k8s.io/test-infra/prow/plugins/approve"
 	"k8s.io/test-infra/prow/repoowners"
+)
+
+const (
+	approveCommand = "APPROVE"
+	lgtmCommand    = "LGTM"
 )
 
 type approve struct {
@@ -86,17 +94,53 @@ func (a *approve) RegisterEventHandler(p plugins.Plugins) {
 	//p.RegisterPullRequestHandler(name, a.handlePullRequestEvent)
 }
 
-func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
-	pr := e.PullRequest
-	org := e.Repository.Owner.Login
-	repo := e.Repository.Name
+func isApprovalCommand(botName, author, comment string, lgtmActsAsApprove bool) bool {
+	if author == botName {
+		return false
+	}
 
-	repoc, err := a.oc.LoadRepoOwners(org, repo, pr.Base.Ref)
+	commandRegex := regexp.MustCompile(`(?m)^/([^\s]+)[\t ]*([^\n\r]*)`)
+
+	for _, match := range commandRegex.FindAllStringSubmatch(comment, -1) {
+		cmd := strings.ToUpper(match[1])
+		if (cmd == lgtmCommand && lgtmActsAsApprove) || cmd == approveCommand {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
+	funcStart := time.Now()
+	defer func() {
+		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
+	}()
+
+	if *(e.Action) != "comment" {
+		log.Debug("Event is not a creation of a comment on an open PR, skipping.")
+		return nil
+	}
+
+	botName, err := a.ghc.BotName()
 	if err != nil {
 		return err
 	}
 
+	pr := e.PullRequest
+	org := e.Repository.Owner.Login
+	repo := e.Repository.Name
+
 	c, err := a.approveFor(org, repo)
+	if err != nil {
+		return err
+	}
+
+	if !isApprovalCommand(botName, e.Author.Name, e.Comment.Body, c.LgtmActsAsApprove) {
+		log.Debug("Comment does not constitute approval, skipping event.")
+		return nil
+	}
+
+	repoc, err := a.oc.LoadRepoOwners(org, repo, pr.Base.Ref)
 	if err != nil {
 		return err
 	}
