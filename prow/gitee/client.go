@@ -3,7 +3,9 @@ package gitee
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/antihax/optional"
@@ -123,11 +125,28 @@ func (c *client) getUserData() error {
 }
 
 func (c *client) ListCollaborators(org, repo string) ([]github.User, error) {
-	return nil, nil
+	cs, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaborators(context.Background(), org, repo, nil)
+	if err != nil {
+		return nil, err
+	}
+	var r []github.User
+	for _, i := range cs {
+		c := github.User{
+			Login: i.Login,
+		}
+		r = append(r, c)
+	}
+	return r, nil
 }
 
 func (c *client) GetRef(org, repo, ref string) (string, error) {
-	return "", nil
+	branch := strings.TrimPrefix(ref, "heads/")
+	b, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoBranchesBranch(context.Background(), org, repo, branch, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return b.Commit.Sha, nil
 }
 
 func (c *client) GetPullRequest(org, repo string, number int) (*github.PullRequest, error) {
@@ -135,41 +154,120 @@ func (c *client) GetPullRequest(org, repo string, number int) (*github.PullReque
 }
 
 func (c *client) GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error) {
-	return nil, nil
+	fs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberFiles(
+		context.Background(), org, repo, int32(number), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var r []github.PullRequestChange
+
+	for _, f := range fs {
+		r = append(r, github.PullRequestChange{Filename: f.Filename})
+	}
+	return r, nil
 }
 
+// actually this method return the labels of pull request not issue
 func (c *client) GetIssueLabels(org, repo string, number int) ([]github.Label, error) {
-	return nil, nil
+	var r []github.Label
+
+	p := int32(1)
+	opt := sdk.GetV5ReposOwnerRepoPullsNumberLabelsOpts{}
+	for {
+		opt.Page = optional.NewInt32(p)
+		ls, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberLabels(
+			context.Background(), org, repo, int32(number), &opt)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(ls) == 0 {
+			break
+		}
+
+		p += 1
+
+		for _, i := range ls {
+			r = append(r, github.Label{Name: i.Name})
+		}
+	}
+
+	return r, nil
 }
 
 func (c *client) ListIssueComments(org, repo string, number int) ([]github.IssueComment, error) {
-	return nil, nil
+	var r []github.IssueComment
+
+	p := int32(1)
+	opt := sdk.GetV5ReposOwnerRepoPullsNumberCommentsOpts{}
+	for {
+		opt.Page = optional.NewInt32(p)
+		cs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberComments(
+			context.Background(), org, repo, int32(number), &opt)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(cs) == 0 {
+			break
+		}
+
+		p += 1
+
+		for _, i := range cs {
+			ct, _ := time.Parse(time.RFC3339, i.CreatedAt)
+			ut, _ := time.Parse(time.RFC3339, i.UpdatedAt)
+
+			cm := github.IssueComment{
+				ID:        int(i.Id),
+				Body:      i.Body,
+				User:      github.User{Login: i.User.Login},
+				HTMLURL:   i.HtmlUrl,
+				CreatedAt: ct,
+				UpdatedAt: ut,
+			}
+			r = append(r, cm)
+		}
+	}
+
+	return r, nil
 }
 
 func (c *client) ListReviews(org, repo string, number int) ([]github.Review, error) {
-	return nil, nil
+	return []github.Review{}, nil
 }
 
 func (c *client) ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error) {
-	return nil, nil
+	return []github.ReviewComment{}, nil
 }
 
 func (c *client) DeleteComment(org, repo string, ID int) error {
-	return nil
+	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsCommentsId(
+		context.Background(), org, repo, int32(ID), nil)
+	return err
 }
 
 func (c *client) CreateComment(org, repo string, number int, comment string) error {
-	return nil
+	opt := sdk.PullRequestCommentPostParam{Body: comment}
+	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberComments(
+		context.Background(), org, repo, int32(number), opt)
+	return err
 }
 
 func (c *client) AddLabel(org, repo string, number int, label string) error {
-	return nil
+	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
+	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
+		context.Background(), org, repo, int32(number), opt)
+	return err
 }
 
 func (c *client) RemoveLabel(org, repo string, number int, label string) error {
-	return nil
+	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
+		context.Background(), org, repo, int32(number), label, nil)
+	return err
 }
 
 func (c *client) ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error) {
-	return nil, nil
+	return []github.ListedIssueEvent{}, nil
 }
