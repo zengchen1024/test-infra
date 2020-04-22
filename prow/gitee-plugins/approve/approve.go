@@ -76,14 +76,6 @@ func (a *approve) PluginName() string {
 	return origina.PluginName
 }
 
-/*
-func (a *approve) PluginConfigBuilder() PluginConfigBuilder {
-	return func() plugins.PluginConfig {
-		return &configuration{}
-	}
-}
-*/
-
 func (a *approve) NewPluginConfig() plugins.PluginConfig {
 	return &configuration{}
 }

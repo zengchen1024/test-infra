@@ -6,7 +6,6 @@ import (
 )
 
 type Plugin interface {
-	//PluginConfigBuilder() PluginConfigBuilder
 	PluginName() string
 	NewPluginConfig() PluginConfig
 	RegisterEventHandler(p Plugins)

@@ -86,7 +86,7 @@ func (d *dispatcher) getPlugins(owner, repo string) []string {
 	return plugins
 }
 
-func (d *dispatcher) GracefulShutdown() {
+func (d *dispatcher) Wait() {
 	d.wg.Wait() // Handle remaining requests
 }
 
@@ -143,7 +143,7 @@ func (d *dispatcher) handlePullRequestEvent(pr *gitee.PullRequestEvent, l *logru
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  pr.Repository.Owner.Login,
 		github.RepoLogField: pr.Repository.Name,
-		github.PrLogField:   pr.Number,
+		github.PrLogField:   pr.PullRequest.Number,
 		"author":            pr.PullRequest.User.Login,
 		"url":               pr.PullRequest.HtmlUrl,
 	})
@@ -191,7 +191,7 @@ func (d *dispatcher) handlePushEvent(pe *gitee.PushEvent, l *logrus.Entry) {
 	defer d.wg.Done()
 
 	l = l.WithFields(logrus.Fields{
-		github.OrgLogField:  pe.Repository.Owner.Name,
+		github.OrgLogField:  pe.Repository.Owner.Login,
 		github.RepoLogField: pe.Repository.Name,
 		"ref":               pe.Ref,
 		"head":              pe.After,
@@ -222,7 +222,7 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 		"commenter":         e.Comment.User.Login,
 		"url":               e.Comment.HtmlUrl,
 	})
-	l.Infof("Review comment %s.", *e.Action)
+	l.Infof("Note %s.", *e.Action)
 
 	for p, h := range d.noteEventHandlers(e.Repository.Owner.Login, e.Repository.Name) {
 		d.wg.Add(1)
@@ -231,7 +231,7 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 			defer d.wg.Done()
 
 			if err := h(e, l); err != nil {
-				l.WithField("plugin", p).WithError(err).Error("Error handling ReviewCommentEvent.")
+				l.WithField("plugin", p).WithError(err).Error("Error handling NoteEvent.")
 			}
 		}(p, h)
 	}

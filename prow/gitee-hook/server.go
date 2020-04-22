@@ -33,7 +33,7 @@ type Server interface {
 }
 
 type Dispatcher interface {
-	GracefulShutdown()
+	Wait()
 	Dispatch(eventType, eventGUID string, payload []byte) error
 }
 
@@ -102,5 +102,5 @@ func (s *server) demuxEvent(eventType, eventGUID string, payload []byte, h http.
 // GracefulShutdown implements a graceful shutdown protocol. It handles all requests sent before
 // receiving the shutdown signal.
 func (s *server) GracefulShutdown() {
-	s.dispatcher.GracefulShutdown()
+	s.dispatcher.Wait()
 }

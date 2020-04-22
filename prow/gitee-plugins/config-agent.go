@@ -59,7 +59,6 @@ func (ca *ConfigAgent) RegisterPluginConfigBuilder(name string, b PluginConfigBu
 	ca.pcb[name] = b
 }
 
-// getPlugins returns a list of plugins that are enabled on a given (org, repository).
 func (ca *ConfigAgent) Config() *Configurations {
 	ca.mut.Lock()
 	defer ca.mut.Unlock()
