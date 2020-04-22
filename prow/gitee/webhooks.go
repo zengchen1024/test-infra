@@ -25,7 +25,6 @@ import (
 	"net/http"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/test-infra/prow/github"
 )
 
 // ValidateWebhook ensures that the provided request conforms to the
@@ -95,8 +94,13 @@ func responseHTTPError(w http.ResponseWriter, statusCode int, response string) {
 	http.Error(w, response, statusCode)
 }
 
+func extractHmacs(tokenGenerator func() []byte) ([][]byte, error) {
+	t := tokenGenerator()
+	return [][]byte{t}, nil
+}
+
 func validatePayload(sig string, tokenGenerator func() []byte, ps func(string) string) bool {
-	hmacs, err := github.ExtractHmacs("", tokenGenerator)
+	hmacs, err := extractHmacs(tokenGenerator)
 	if err != nil {
 		logrus.WithError(err).Error("couldn't unmarshal the hmac secret")
 		return false

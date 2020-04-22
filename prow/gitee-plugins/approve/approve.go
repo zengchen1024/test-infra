@@ -91,7 +91,7 @@ func (a *approve) NewPluginConfig() plugins.PluginConfig {
 func (a *approve) RegisterEventHandler(p plugins.Plugins) {
 	name := a.PluginName()
 	p.RegisterNoteEventHandler(name, a.handleNoteEvent)
-	//p.RegisterPullRequestHandler(name, a.handlePullRequestEvent)
+	p.RegisterPullRequestHandler(name, a.handlePullRequestEvent)
 }
 
 func isApprovalCommand(botName, author, comment string, lgtmActsAsApprove bool) bool {
@@ -126,7 +126,6 @@ func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
 		return err
 	}
 
-	pr := e.PullRequest
 	org := e.Repository.Owner.Login
 	repo := e.Repository.Name
 
@@ -138,6 +137,15 @@ func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
 	if !isApprovalCommand(botName, e.Author.Name, e.Comment.Body, c.LgtmActsAsApprove) {
 		log.Debug("Comment does not constitute approval, skipping event.")
 		return nil
+	}
+
+	return a.handle(org, repo, e.PullRequest, log)
+}
+
+func (a *approve) handle(org, repo string, pr *gitee.PullRequestHook, log *logrus.Entry) error {
+	c, err := a.approveFor(org, repo)
+	if err != nil {
+		return err
 	}
 
 	repoc, err := a.oc.LoadRepoOwners(org, repo, pr.Base.Ref)
@@ -161,7 +169,22 @@ func (a *approve) handleNoteEvent(e *gitee.NoteEvent, log *logrus.Entry) error {
 }
 
 func (a *approve) handlePullRequestEvent(e *gitee.PullRequestEvent, log *logrus.Entry) error {
-	return nil
+	funcStart := time.Now()
+	defer func() {
+		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
+	}()
+
+	if *(e.State) != "open" {
+		log.Debug("Pull request state is not open, skipping...")
+		return nil
+	}
+
+	if *(e.Action) != "open" && *(e.Action) != "update" {
+		log.Debug("Pull request event action cannot constitute approval, skipping...")
+		return nil
+	}
+
+	return a.handle(e.Repository.Owner.Login, e.Repository.Name, e.PullRequest, log)
 }
 
 func getGiteeOption() prowConfig.GitHubOptions {

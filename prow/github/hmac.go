@@ -54,7 +54,7 @@ func ValidatePayload(payload []byte, sig string, tokenGenerator func() []byte) b
 		return false
 	}
 
-	hmacs, err := ExtractHmacs(event.Repo.FullName, tokenGenerator)
+	hmacs, err := extractHmacs(event.Repo.FullName, tokenGenerator)
 	if err != nil {
 		logrus.WithError(err).Error("couldn't unmarshal the hmac secret")
 		return false
@@ -80,12 +80,12 @@ func PayloadSignature(payload []byte, key []byte) string {
 	return "sha1=" + hex.EncodeToString(sum)
 }
 
-// ExtractHmacs returns all *valid* HMAC tokens for given repository/organization.
+// extractHmacs returns all *valid* HMAC tokens for given repository/organization.
 // It considers only the tokens at the most specific level configured for the given repo.
 // For example : if a token for repo is present and it doesn't match the repo, we will
 // not try to find a match with org level token. However if no token is present for repo,
 // we will try to match with org level.
-func ExtractHmacs(repo string, tokenGenerator func() []byte) ([][]byte, error) {
+func extractHmacs(repo string, tokenGenerator func() []byte) ([][]byte, error) {
 	t := tokenGenerator()
 	repoToTokenMap := map[string]hmacsForRepo{}
 
