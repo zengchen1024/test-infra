@@ -22,4 +22,7 @@ type Client interface {
 	CreatePRComment(org, repo string, number int, comment string) error
 	AddLabel(org, repo string, number int, label string) error
 	RemoveLabel(org, repo string, number int, label string) error
+
+	AssignPR(owner, repo string, number int, logins []string) error
+	UnassignPR(owner, repo string, number int, logins []string) error
 }

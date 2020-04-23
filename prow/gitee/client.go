@@ -237,3 +237,17 @@ func (c *client) RemoveLabel(org, repo string, number int, label string) error {
 		context.Background(), org, repo, int32(number), label, nil)
 	return err
 }
+
+func (c *client) AssignPR(org, repo string, number int, logins []string) error {
+	opt := sdk.PullRequestAssigneePostParam{Assignees: strings.Join(logins, ",")}
+
+	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberAssignees(
+		context.Background(), org, repo, int32(number), opt)
+	return err
+}
+
+func (c *client) UnassignPR(org, repo string, number int, logins []string) error {
+	_, _, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsNumberAssignees(
+		context.Background(), org, repo, int32(number), strings.Join(logins, ","), nil)
+	return err
+}
