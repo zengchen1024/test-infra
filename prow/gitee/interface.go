@@ -15,15 +15,11 @@ type Client interface {
 
 	ListCollaborators(org, repo string) ([]github.User, error)
 	GetRef(org, repo, ref string) (string, error)
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
-	ListIssueComments(org, repo string, number int) ([]github.IssueComment, error)
-	ListReviews(org, repo string, number int) ([]github.Review, error)
-	ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error)
-	DeleteComment(org, repo string, ID int) error
-	CreateComment(org, repo string, number int, comment string) error
+	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
+	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
+	DeletePRComment(org, repo string, ID int) error
+	CreatePRComment(org, repo string, number int, comment string) error
 	AddLabel(org, repo string, number int, label string) error
 	RemoveLabel(org, repo string, number int, label string) error
-	ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error)
 }
