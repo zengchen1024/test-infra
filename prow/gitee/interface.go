@@ -25,7 +25,7 @@ type Client interface {
 
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
-	AssignGiteeIssue(org, repo string, number int, login string) error
-	UnassignGiteeIssue(org, repo string, number int, login string) error
-	CreateGiteeIssueComment(org, repo string, number int, comment string) error
+	AssignGiteeIssue(org, repo string, number string, login string) error
+	UnassignGiteeIssue(org, repo string, number string, login string) error
+	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 }

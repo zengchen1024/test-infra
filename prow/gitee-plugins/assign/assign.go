@@ -2,7 +2,6 @@ package assign
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -19,9 +18,9 @@ type githubClient interface {
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
 	CreatePRComment(owner, repo string, number int, comment string) error
-	AssignGiteeIssue(org, repo string, number int, login string) error
-	UnassignGiteeIssue(org, repo string, number int, login string) error
-	CreateGiteeIssueComment(owner, repo string, number int, comment string) error
+	AssignGiteeIssue(org, repo string, number string, login string) error
+	UnassignGiteeIssue(org, repo string, number string, login string) error
+	CreateGiteeIssueComment(owner, repo string, number string, comment string) error
 }
 
 type assign struct {
@@ -31,37 +30,41 @@ type assign struct {
 
 type ghclient struct {
 	githubClient
-	isPR bool
+	issueNumber string
+}
+
+func (c *ghclient) ispr() bool {
+	return c.issueNumber == ""
 }
 
 func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) error {
-	if c.isPR {
+	if c.ispr() {
 		return c.AssignPR(owner, repo, number, logins)
 	}
 
 	if len(logins) > 1 {
 		return fmt.Errorf("can't assign more one persons to an issue at same time")
 	}
-	return c.AssignGiteeIssue(owner, repo, number, logins[0])
+	return c.AssignGiteeIssue(owner, repo, c.issueNumber, logins[0])
 }
 
 func (c *ghclient) UnassignIssue(owner, repo string, number int, logins []string) error {
-	if c.isPR {
+	if c.ispr() {
 		return c.UnassignPR(owner, repo, number, logins)
 	}
 
 	if len(logins) > 1 {
 		return fmt.Errorf("can't unassign more one persons from an issue at same time")
 	}
-	return c.UnassignGiteeIssue(owner, repo, number, logins[0])
+	return c.UnassignGiteeIssue(owner, repo, c.issueNumber, logins[0])
 }
 
 func (c *ghclient) CreateComment(owner, repo string, number int, comment string) error {
-	if c.isPR {
+	if c.ispr() {
 		return c.CreatePRComment(owner, repo, number, comment)
 	}
 
-	return c.CreateGiteeIssueComment(owner, repo, number, comment)
+	return c.CreateGiteeIssueComment(owner, repo, c.issueNumber, comment)
 }
 
 func (c *ghclient) RequestReview(org, repo string, number int, logins []string) error {
@@ -112,11 +115,16 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return nil
 	}
 
-	isPR := (*(e.NoteableType) == "PullRequest")
-	n := e.PullRequest.Number
-	if !isPR {
-		v, _ := strconv.ParseInt(e.Issue.Number, 10, 32)
-		n = int32(v)
+	var n int32
+	issueNumber := ""
+	switch *(e.NoteableType) {
+	case "PullRequest":
+		n = e.PullRequest.Number
+	case "Issue":
+		issueNumber = e.Issue.Number
+	default:
+		log.Debug("not supported note type")
+		return nil
 	}
 
 	ce := github.GenericCommentEvent{
@@ -131,5 +139,5 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		IsPR:    false,
 	}
 
-	return origina.Handle(ce, &ghclient{githubClient: a.ghc, isPR: true}, log)
+	return origina.Handle(ce, &ghclient{githubClient: a.ghc, issueNumber: issueNumber}, log)
 }
