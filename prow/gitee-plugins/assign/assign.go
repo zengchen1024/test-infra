@@ -19,7 +19,9 @@ type githubClient interface {
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
 	CreatePRComment(owner, repo string, number int, comment string) error
-	//CreateIssueComment(owner, repo string, number int, comment string) error
+	AssignGiteeIssue(org, repo string, number int, login string) error
+	UnassignGiteeIssue(org, repo string, number int, login string) error
+	CreateGiteeIssueComment(owner, repo string, number int, comment string) error
 }
 
 type assign struct {
@@ -36,21 +38,30 @@ func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) 
 	if c.isPR {
 		return c.AssignPR(owner, repo, number, logins)
 	}
-	return nil
+
+	if len(logins) > 1 {
+		return fmt.Errorf("can't assign more one persons to an issue at same time")
+	}
+	return c.AssignGiteeIssue(owner, repo, number, logins[0])
 }
 
 func (c *ghclient) UnassignIssue(owner, repo string, number int, logins []string) error {
 	if c.isPR {
 		return c.UnassignPR(owner, repo, number, logins)
 	}
-	return nil
+
+	if len(logins) > 1 {
+		return fmt.Errorf("can't unassign more one persons from an issue at same time")
+	}
+	return c.UnassignGiteeIssue(owner, repo, number, logins[0])
 }
 
 func (c *ghclient) CreateComment(owner, repo string, number int, comment string) error {
 	if c.isPR {
 		return c.CreatePRComment(owner, repo, number, comment)
 	}
-	return nil
+
+	return c.CreateGiteeIssueComment(owner, repo, number, comment)
 }
 
 func (c *ghclient) RequestReview(org, repo string, number int, logins []string) error {

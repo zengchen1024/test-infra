@@ -3,6 +3,7 @@ package gitee
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -249,5 +250,27 @@ func (c *client) AssignPR(org, repo string, number int, logins []string) error {
 func (c *client) UnassignPR(org, repo string, number int, logins []string) error {
 	_, _, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsNumberAssignees(
 		context.Background(), org, repo, int32(number), strings.Join(logins, ","), nil)
+	return err
+}
+
+func (c *client) AssignGiteeIssue(org, repo string, number int, login string) error {
+	opt := sdk.IssueUpdateParam{
+		Repo:     repo,
+		Assignee: login,
+	}
+
+	_, _, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
+		context.Background(), org, strconv.Itoa(number), opt)
+	return err
+}
+
+func (c *client) UnassignGiteeIssue(org, repo string, number int, login string) error {
+	return c.AssignGiteeIssue(org, repo, number, "")
+}
+
+func (c *client) CreateGiteeIssueComment(org, repo string, number int, comment string) error {
+	opt := sdk.IssueCommentPostParam{Body: comment}
+	_, _, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(
+		context.Background(), org, repo, strconv.Itoa(number), opt)
 	return err
 }
