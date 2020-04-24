@@ -37,8 +37,8 @@ type githubClient interface {
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
 	BotName() (string, error)
-	AddLabel(org, repo string, number int, label string) error
-	RemoveLabel(org, repo string, number int, label string) error
+	AddPRLabel(org, repo string, number int, label string) error
+	RemovePRLabel(org, repo string, number int, label string) error
 }
 
 type ownersClient interface {
@@ -83,6 +83,14 @@ func (c *ghclient) DeleteComment(org, repo string, id int) error {
 
 func (c *ghclient) CreateComment(org, repo string, number int, comment string) error {
 	return c.CreatePRComment(org, repo, number, comment)
+}
+
+func (c *ghclient) AddLabel(org, repo string, number int, label string) error {
+	return c.AddPRLabel(org, repo, number, label)
+}
+
+func (c *ghclient) RemoveLabel(org, repo string, number int, label string) error {
+	return c.RemovePRLabel(org, repo, number, label)
 }
 
 func (c *ghclient) ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error) {

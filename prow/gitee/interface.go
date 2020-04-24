@@ -20,8 +20,8 @@ type Client interface {
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
-	AddLabel(org, repo string, number int, label string) error
-	RemoveLabel(org, repo string, number int, label string) error
+	AddPRLabel(org, repo string, number int, label string) error
+	RemovePRLabel(org, repo string, number int, label string) error
 
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error

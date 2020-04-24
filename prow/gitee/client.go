@@ -225,14 +225,14 @@ func (c *client) CreatePRComment(org, repo string, number int, comment string) e
 	return err
 }
 
-func (c *client) AddLabel(org, repo string, number int, label string) error {
+func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
 		context.Background(), org, repo, int32(number), opt)
 	return err
 }
 
-func (c *client) RemoveLabel(org, repo string, number int, label string) error {
+func (c *client) RemovePRLabel(org, repo string, number int, label string) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
 		context.Background(), org, repo, int32(number), label, nil)
 	return err
