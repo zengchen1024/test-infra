@@ -5,10 +5,8 @@ import (
 	"k8s.io/test-infra/prow/github"
 )
 
-func Handle(e github.GenericCommentEvent, gc githubClient, log *logrus.Entry) error {
-	err := handle(newAssignHandler(e, gc, log))
-	if e.IsPR {
-		err = combineErrors(err, handle(newReviewHandler(e, gc, log)))
-	}
-	return err
+func HandleAssign(e github.GenericCommentEvent, gc githubClient, onAddFailure func(mu github.MissingUsers) string, log *logrus.Entry) error {
+	h := newAssignHandler(e, gc, log)
+	h.addFailureResponse = onAddFailure
+	return handle(h)
 }

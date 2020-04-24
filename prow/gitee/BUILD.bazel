@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
+        "error.go",
         "github.go",
         "interface.go",
         "webhooks.go",

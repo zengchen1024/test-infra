@@ -28,4 +28,6 @@ type Client interface {
 	AssignGiteeIssue(org, repo string, number string, login string) error
 	UnassignGiteeIssue(org, repo string, number string, login string) error
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
+
+	IsCollaborator(owner, repo, login string) (bool, error)
 }

@@ -2,11 +2,13 @@ package assign
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	prowConfig "k8s.io/test-infra/prow/config"
+	"k8s.io/test-infra/prow/gitee"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
@@ -15,6 +17,7 @@ import (
 )
 
 type githubClient interface {
+	ListCollaborators(org, repo string) ([]github.User, error)
 	AssignPR(owner, repo string, number int, logins []string) error
 	UnassignPR(owner, repo string, number int, logins []string) error
 	CreatePRComment(owner, repo string, number int, comment string) error
@@ -43,9 +46,16 @@ func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) 
 	}
 
 	if len(logins) > 1 {
-		return fmt.Errorf("can't assign more one persons to an issue at same time")
+		return github.MissingUsers{Users: logins}
 	}
-	return c.AssignGiteeIssue(owner, repo, c.issueNumber, logins[0])
+
+	err := c.AssignGiteeIssue(owner, repo, c.issueNumber, logins[0])
+	if err != nil {
+		if _, ok := err.(gitee.ErrorForbidden); ok {
+			return github.MissingUsers{Users: logins}
+		}
+	}
+	return err
 }
 
 func (c *ghclient) UnassignIssue(owner, repo string, number int, logins []string) error {
@@ -139,5 +149,29 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		IsPR:    false,
 	}
 
-	return origina.Handle(ce, &ghclient{githubClient: a.ghc, issueNumber: issueNumber}, log)
+	var f func(mu github.MissingUsers) string
+	if issueNumber == "" {
+		f = func(mu github.MissingUsers) string {
+			return ""
+		}
+	} else {
+		f = func(mu github.MissingUsers) string {
+			if len(mu.Users) > 1 {
+				return "Can only assign one person to an issue once."
+			}
+
+			v, err := a.ghc.ListCollaborators(ce.Repo.Owner.Login, ce.Repo.Name)
+			if err == nil {
+				v1 := make([]string, len(v))
+				for i, item := range v {
+					v1[i] = item.Login
+				}
+
+				return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose one of following members as assignee.\n- %s", mu.Users[0], strings.Join(v1, "\n- "))
+			}
+			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", mu.Users[0])
+		}
+	}
+
+	return origina.HandleAssign(ce, &ghclient{githubClient: a.ghc, issueNumber: issueNumber}, f, log)
 }

@@ -257,9 +257,14 @@ func (c *client) AssignGiteeIssue(org, repo string, number string, login string)
 		Repo:     repo,
 		Assignee: login,
 	}
-
-	_, _, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
+	_, v, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
 		context.Background(), org, number, opt)
+
+	if err != nil {
+		if v.StatusCode == 403 {
+			return ErrorForbidden{err: err.Error()}
+		}
+	}
 	return err
 }
 
@@ -272,4 +277,16 @@ func (c *client) CreateGiteeIssueComment(org, repo string, number string, commen
 	_, _, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(
 		context.Background(), org, repo, number, opt)
 	return err
+}
+
+func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
+	v, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaboratorsUsername(
+		context.Background(), owner, repo, login, nil)
+	if err != nil {
+		if v.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
