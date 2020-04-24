@@ -33,11 +33,15 @@ type assign struct {
 
 type ghclient struct {
 	githubClient
-	issueNumber string
+	e *sdk.NoteEvent
 }
 
 func (c *ghclient) ispr() bool {
-	return c.issueNumber == ""
+	return *(c.e.NoteableType) == "PullRequest"
+}
+
+func (c *ghclient) issueNumber() string {
+	return c.e.Issue.Number
 }
 
 func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) error {
@@ -49,7 +53,7 @@ func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) 
 		return github.MissingUsers{Users: logins}
 	}
 
-	err := c.AssignGiteeIssue(owner, repo, c.issueNumber, logins[0])
+	err := c.AssignGiteeIssue(owner, repo, c.issueNumber(), logins[0])
 	if err != nil {
 		if _, ok := err.(gitee.ErrorForbidden); ok {
 			return github.MissingUsers{Users: logins}
@@ -66,7 +70,11 @@ func (c *ghclient) UnassignIssue(owner, repo string, number int, logins []string
 	if len(logins) > 1 {
 		return fmt.Errorf("can't unassign more one persons from an issue at same time")
 	}
-	return c.UnassignGiteeIssue(owner, repo, c.issueNumber, logins[0])
+
+	if c.e.Issue.Assignee != nil && c.e.Issue.Assignee.Login == logins[0] {
+		return c.UnassignGiteeIssue(owner, repo, c.issueNumber(), logins[0])
+	}
+	return nil
 }
 
 func (c *ghclient) CreateComment(owner, repo string, number int, comment string) error {
@@ -74,7 +82,7 @@ func (c *ghclient) CreateComment(owner, repo string, number int, comment string)
 		return c.CreatePRComment(owner, repo, number, comment)
 	}
 
-	return c.CreateGiteeIssueComment(owner, repo, c.issueNumber, comment)
+	return c.CreateGiteeIssueComment(owner, repo, c.issueNumber(), comment)
 }
 
 func (c *ghclient) RequestReview(org, repo string, number int, logins []string) error {
@@ -126,12 +134,12 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	var n int32
-	issueNumber := ""
+	isPR := true
 	switch *(e.NoteableType) {
 	case "PullRequest":
 		n = e.PullRequest.Number
 	case "Issue":
-		issueNumber = e.Issue.Number
+		isPR = false
 	default:
 		log.Debug("not supported note type")
 		return nil
@@ -150,14 +158,14 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	var f func(mu github.MissingUsers) string
-	if issueNumber == "" {
+	if isPR {
 		f = func(mu github.MissingUsers) string {
 			return ""
 		}
 	} else {
 		f = func(mu github.MissingUsers) string {
 			if len(mu.Users) > 1 {
-				return "Can only assign one person to an issue once."
+				return "Can only assign one person to an issue."
 			}
 
 			v, err := a.ghc.ListCollaborators(ce.Repo.Owner.Login, ce.Repo.Name)
@@ -173,5 +181,5 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		}
 	}
 
-	return origina.HandleAssign(ce, &ghclient{githubClient: a.ghc, issueNumber: issueNumber}, f, log)
+	return origina.HandleAssign(ce, &ghclient{githubClient: a.ghc, e: e}, f, log)
 }
