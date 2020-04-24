@@ -44,9 +44,43 @@ func (c *ghclient) issueNumber() string {
 	return c.e.Issue.Number
 }
 
+func (c *ghclient) assignPR(owner, repo string, number int, logins []string) error {
+	v, err := c.ListCollaborators(owner, repo)
+	if err != nil {
+		return err
+	}
+
+	cs := map[string]bool{}
+	for _, i := range getCollaborators(v) {
+		cs[i] = true
+	}
+
+	var u []string
+	var u1 []string
+	for _, i := range logins {
+		if cs[i] {
+			u = append(u, i)
+		} else {
+			u1 = append(u1, i)
+		}
+	}
+
+	if len(u) > 0 {
+		err = c.AssignPR(owner, repo, number, u)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(u1) > 0 {
+		return github.MissingUsers{Users: u1}
+	}
+	return nil
+}
+
 func (c *ghclient) AssignIssue(owner, repo string, number int, logins []string) error {
 	if c.ispr() {
-		return c.AssignPR(owner, repo, number, logins)
+		return c.assignPR(owner, repo, number, logins)
 	}
 
 	if len(logins) > 1 {
@@ -159,27 +193,49 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	var f func(mu github.MissingUsers) string
 	if isPR {
-		f = func(mu github.MissingUsers) string {
-			return ""
-		}
+		f = buildAssignPRFailureComment(a, ce.Repo.Owner.Login, ce.Repo.Name)
 	} else {
-		f = func(mu github.MissingUsers) string {
-			if len(mu.Users) > 1 {
-				return "Can only assign one person to an issue."
-			}
-
-			v, err := a.ghc.ListCollaborators(ce.Repo.Owner.Login, ce.Repo.Name)
-			if err == nil {
-				v1 := make([]string, len(v))
-				for i, item := range v {
-					v1[i] = item.Login
-				}
-
-				return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose one of following members as assignee.\n- %s", mu.Users[0], strings.Join(v1, "\n- "))
-			}
-			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", mu.Users[0])
-		}
+		f = buildAssignIssueFailureComment(a, ce.Repo.Owner.Login, ce.Repo.Name)
 	}
-
 	return origina.HandleAssign(ce, &ghclient{githubClient: a.ghc, e: e}, f, log)
+}
+
+func buildAssignPRFailureComment(a *assign, org, repo string) func(mu github.MissingUsers) string {
+
+	return func(mu github.MissingUsers) string {
+		v, err := a.ghc.ListCollaborators(org, repo)
+		if err == nil {
+			v1 := getCollaborators(v)
+
+			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose following members as assignees.\n- %s", strings.Join(mu.Users, ", "), strings.Join(v1, "\n- "))
+		}
+
+		return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", strings.Join(mu.Users, ", "))
+	}
+}
+
+func buildAssignIssueFailureComment(a *assign, org, repo string) func(mu github.MissingUsers) string {
+
+	return func(mu github.MissingUsers) string {
+		if len(mu.Users) > 1 {
+			return "Can only assign one person to an issue."
+		}
+
+		v, err := a.ghc.ListCollaborators(org, repo)
+		if err == nil {
+			v1 := getCollaborators(v)
+
+			return fmt.Sprintf("Gitee didn't allow you to assign to: %s.\n\nChoose one of following members as assignee.\n- %s", mu.Users[0], strings.Join(v1, "\n- "))
+		}
+
+		return fmt.Sprintf("Gitee didn't allow you to assign to: %s.", mu.Users[0])
+	}
+}
+
+func getCollaborators(u []github.User) []string {
+	r := make([]string, len(u))
+	for i, item := range u {
+		r[i] = item.Login
+	}
+	return r
 }
