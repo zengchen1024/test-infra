@@ -12,7 +12,6 @@ import (
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
-	originp "k8s.io/test-infra/prow/plugins"
 	origina "k8s.io/test-infra/prow/plugins/assign"
 )
 
@@ -55,25 +54,25 @@ func (c *ghclient) assignPR(owner, repo string, number int, logins []string) err
 		cs[i] = true
 	}
 
-	var u []string
-	var u1 []string
+	var toAdd []string
+	var toExclude []string
 	for _, i := range logins {
 		if cs[i] {
-			u = append(u, i)
+			toAdd = append(toAdd, i)
 		} else {
-			u1 = append(u1, i)
+			toExclude = append(toExclude, i)
 		}
 	}
 
-	if len(u) > 0 {
-		err = c.AssignPR(owner, repo, number, u)
+	if len(toAdd) > 0 {
+		err = c.AssignPR(owner, repo, number, toAdd)
 		if err != nil {
 			return err
 		}
 	}
 
-	if len(u1) > 0 {
-		return github.MissingUsers{Users: u1}
+	if len(toExclude) > 0 {
+		return github.MissingUsers{Users: toExclude}
 	}
 	return nil
 }
@@ -134,13 +133,8 @@ func NewAssign(f plugins.GetPluginConfig, ghc githubClient) plugins.Plugin {
 	}
 }
 
-func (a *assign) HelpProvider(enabledRepos []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
-	h, ok := originp.HelpProviders()[a.PluginName()]
-	if !ok {
-		return nil, fmt.Errorf("can't find the assign's original helper method")
-	}
-
-	return h(nil, enabledRepos)
+func (a *assign) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
+	return origina.HelpProvider(nil, nil)
 }
 
 func (a *assign) PluginName() string {

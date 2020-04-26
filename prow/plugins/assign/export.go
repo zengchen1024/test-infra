@@ -10,3 +10,5 @@ func HandleAssign(e github.GenericCommentEvent, gc githubClient, onAddFailure fu
 	h.addFailureResponse = onAddFailure
 	return handle(h)
 }
+
+var HelpProvider = helpProvider

@@ -125,12 +125,7 @@ func (a *approve) HelpProvider(enabledRepos []prowConfig.OrgRepo) (*pluginhelp.P
 
 	c1 := originp.Configuration{Approve: c.Approve}
 
-	h, ok := originp.HelpProviders()[a.PluginName()]
-	if !ok {
-		return nil, fmt.Errorf("can't find the approve's original helper method")
-	}
-
-	return h(&c1, enabledRepos)
+	return origina.HelpProvider(&c1, enabledRepos)
 }
 
 func (a *approve) PluginName() string {
