@@ -231,6 +231,13 @@ func (c *client) CreatePRComment(org, repo string, number int, comment string) e
 	return err
 }
 
+func (c *client) UpdatePRComment(org, repo string, commentID int, comment string) error {
+	opt := sdk.PullRequestCommentPatchParam{Body: comment}
+	_, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsCommentsId(
+		context.Background(), org, repo, int32(commentID), opt)
+	return err
+}
+
 func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(

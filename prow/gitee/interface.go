@@ -20,6 +20,7 @@ type Client interface {
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
+	UpdatePRComment(org, repo string, commentID int, comment string) error
 	AddPRLabel(org, repo string, number int, label string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
