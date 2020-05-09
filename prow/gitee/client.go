@@ -304,6 +304,18 @@ func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 	return true, nil
 }
 
+func (c *client) IsMember(org, login string) (bool, error) {
+	_, v, err := c.ac.OrganizationsApi.GetV5OrgsOrgMembershipsUsername(
+		context.Background(), org, login, nil)
+	if err != nil {
+		if v.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error) {
 	var r github.SingleCommit
 

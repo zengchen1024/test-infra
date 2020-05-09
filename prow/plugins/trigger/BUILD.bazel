@@ -41,6 +41,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "export.go",
         "generic-comment.go",
         "pull-request.go",
         "push.go",

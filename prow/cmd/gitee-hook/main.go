@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/test-infra/prow/interrupts"
 
 	"k8s.io/test-infra/pkg/flagutil"
+	prowv1 "k8s.io/test-infra/prow/client/clientset/versioned/typed/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/config/secret"
 	prowflagutil "k8s.io/test-infra/prow/flagutil"
@@ -86,7 +88,6 @@ func gatherOptions(fs *flag.FlagSet, args ...string) options {
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "Path to the file containing the GitHub HMAC secret.")
 	fs.StringVar(&o.slackTokenFile, "slack-token-file", "", "Path to the file containing the Slack token to use.")
 	fs.Parse(args)
-	o.configPath = config.ConfigPath(o.configPath)
 	return o
 }
 
@@ -129,14 +130,14 @@ func main() {
 		logrus.WithError(err).Fatal("Error loading plugins config.")
 	}
 
-	cs, err := buildClients(&o, secretAgent, pluginAgent, configAgent)
+	cs, err := buildClients(&o, secretAgent, pluginAgent, configAgent.Config)
 	if err != nil {
 		logrus.WithError(err).Fatal("Error building clients.")
 	}
 
 	pm := plugins.NewPluginManager()
 
-	initPlugins(pluginAgent, pm, cs)
+	initPlugins(configAgent.Config, pluginAgent, pm, cs)
 
 	if err := pluginAgent.Start(o.pluginConfig, true, pm.HelpProviders()); err != nil {
 		logrus.WithError(err).Fatal("Error loading plugins config.")
@@ -165,7 +166,7 @@ func main() {
 
 	// TODO remove this health endpoint when the migration to health endpoint is done
 	// Return 200 on / for health checks.
-	http.HandleFunc("/gitee", func(w http.ResponseWriter, r *http.Request) {})
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {})
 
 	// For /hook, handle a webhook normally.
 	http.Handle("/gitee-hook", server)
@@ -184,9 +185,10 @@ type clients struct {
 	giteeClient    gitee.Client
 	giteeGitClient git.ClientFactory
 	ownersClient   repoowners.Interface
+	prowJobClient  prowv1.ProwJobInterface
 }
 
-func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.ConfigAgent, configAgent *config.Agent) (*clients, error) {
+func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.ConfigAgent, cfg config.Getter) (*clients, error) {
 	giteeClient, err := o.gitee.GiteeClient(secretAgent, o.dryRun)
 	if err != nil {
 		return nil, err
@@ -196,6 +198,11 @@ func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.Co
 		return nil, err
 	}
 
+	prowJobClient, err := o.kubernetes.ProwJobClient(cfg().ProwJobNamespace, o.dryRun)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting ProwJob client for infrastructure cluster: %w", err)
+	}
+
 	mdYAMLEnabled := func(org, repo string) bool {
 		return pluginAgent.Config().MDYAMLEnabled(org, repo)
 	}
@@ -203,7 +210,7 @@ func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.Co
 		return pluginAgent.Config().SkipCollaborators(org, repo)
 	}
 	ownersDirBlacklist := func() config.OwnersDirBlacklist {
-		return configAgent.Config().OwnersDirBlacklist
+		return cfg().OwnersDirBlacklist
 	}
 	ownersClient := repoowners.NewClient(giteeGitClient, giteeClient, mdYAMLEnabled, skipCollaborators, ownersDirBlacklist)
 
@@ -211,6 +218,7 @@ func buildClients(o *options, secretAgent *secret.Agent, pluginAgent *plugins.Co
 		giteeClient:    giteeClient,
 		giteeGitClient: giteeGitClient,
 		ownersClient:   ownersClient,
+		prowJobClient:  prowJobClient,
 	}
 	return cs, nil
 }
