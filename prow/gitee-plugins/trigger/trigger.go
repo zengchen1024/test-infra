@@ -195,5 +195,5 @@ func setJob(org, repo string, job *prowConfig.JobBase) {
 	if job.Annotations == nil {
 		job.Annotations = make(map[string]string)
 	}
-	job.Annotations[jobreporter.JobPlatformAnnotation] = "gitee"
+	job.Annotations[reporter.JobPlatformAnnotation] = "gitee"
 }
