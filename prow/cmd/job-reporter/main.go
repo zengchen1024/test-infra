@@ -26,10 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/pkg/flagutil"
-	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	prowjobinformer "k8s.io/test-infra/prow/client/informers/externalversions"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/crier"
+	prowflagutil "k8s.io/test-infra/prow/flagutil"
 	"k8s.io/test-infra/prow/interrupts"
 	"k8s.io/test-infra/prow/kube"
 	"k8s.io/test-infra/prow/logrusutil"
@@ -44,6 +44,9 @@ type options struct {
 	kubernetes prowflagutil.KubernetesOptions
 	github     prowflagutil.GitHubOptions // TODO(fejta): remove
 	gitee      prowflagutil.GiteeOptions
+
+	githubWorkers int
+	giteeWorkers  int
 }
 
 func gatherOptions(fs *flag.FlagSet, args ...string) options {
@@ -52,6 +55,9 @@ func gatherOptions(fs *flag.FlagSet, args ...string) options {
 	fs.StringVar(&o.configPath, "config-path", "", "Path to config.yaml.")
 	fs.StringVar(&o.jobConfigPath, "job-config-path", "", "Path to prow job configs.")
 	fs.BoolVar(&o.skipReport, "skip-report", false, "Validate that crier is reporting to github, not plank")
+
+	fs.IntVar(&o.githubWorkers, "github-workers", 0, "Number of github report workers (0 means disabled)")
+	fs.IntVar(&o.giteeWorkers, "gitee-workers", 0, "Number of gitee report workers (0 means disabled)")
 
 	fs.BoolVar(&o.dryRun, "dry-run", true, "Whether or not to make mutating API calls to GitHub.")
 	for _, group := range []flagutil.OptionGroup{&o.kubernetes, &o.github, &o.gitee} {
@@ -111,18 +117,20 @@ func run(o *options, cfg config.Getter) error {
 		return fmt.Errorf("prow client: %w", err)
 	}
 
+	defer interrupts.WaitForGracefulShutdown()
+
 	const resync = 0 * time.Minute
 	prowjobInformerFactory := prowjobinformer.NewSharedInformerFactoryWithOptions(
 		prowjobClientset, resync, prowjobinformer.WithNamespace(cfg().ProwJobNamespace))
 
 	prowjobInformerFactory.Start(interrupts.Context().Done())
 
-	for _, r := range reporters {
+	for r, n := range reporters {
 		c := crier.NewController(
 			prowjobClientset,
 			kube.RateLimiter(r.GetName()),
 			prowjobInformerFactory.Prow().V1().ProwJobs(),
-			r, 1)
+			r, n)
 
 		interrupts.Run(func(ctx context.Context) { c.Run(ctx) })
 	}
