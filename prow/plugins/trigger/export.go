@@ -47,6 +47,11 @@ func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, set
 		}
 	}
 
+	// if the pr can't be merged automatically, don't run jobs
+	if pr.PullRequest.Mergable != nil && (!*(pr.PullRequest.Mergable)) {
+		return nil
+	}
+
 	switch pr.Action {
 	case github.PullRequestActionOpened:
 		// When a PR is opened, if the author is in the org then build it.
@@ -82,10 +87,8 @@ func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, set
 			return buildAll(c, &pr.PullRequest, pr.GUID, baseSHA, presubmits)
 		}
 	case github.PullRequestActionEdited:
-		if pr.PullRequest.Mergable != nil && *(pr.PullRequest.Mergable) {
-			// the base of the PR changed and we need to re-test it
-			return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
-		}
+		// the base of the PR changed and we need to re-test it
+		return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
 	case github.PullRequestActionSynchronize:
 		return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
 	case github.PullRequestActionLabeled:
