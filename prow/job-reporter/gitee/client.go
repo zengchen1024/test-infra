@@ -1,12 +1,23 @@
 package gitee
 
 import (
+	"fmt"
+	"regexp"
 	"sort"
+	"strconv"
+	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/report"
+)
+
+var (
+	JobsResultNotification   = "Checks Results.\n%s\n  <details>Git tree hash: %s</details>"
+	JobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf(JobsResultNotification, "(.*)", "(.*)"))
+	jobResultNotification    = "%s %s — %s [Details](%s)"
+	jobResultNotificationRe  = regexp.MustCompile(fmt.Sprintf("%s %s — %s \\[Details\\]\\(%s\\)", ".*", "(.*)", ".*", ".*"))
 )
 
 type giteeClient interface {
@@ -15,6 +26,7 @@ type giteeClient interface {
 	CreatePRComment(org, repo string, number int, comment string) error
 	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
+	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 }
 
 var _ report.GitHubClient = (*ghclient)(nil)
@@ -55,5 +67,89 @@ func (c *ghclient) EditComment(org, repo string, ID int, comment string) error {
 }
 
 func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
-	return nil
+	prNumber, err := parsePRNumber(org, repo, s)
+	if err != nil {
+		return err
+	}
+
+	comments, err := c.ListIssueComments(org, repo, prNumber)
+	if err != nil {
+		return err
+	}
+
+	botname, err := c.BotName()
+	if err != nil {
+		return err
+	}
+
+	jobsOldComment, commentId := findCheckResultComment(botname, ref, comments)
+
+	desc := genJobResultComment(jobsOldComment, ref, s)
+
+	if jobsOldComment == "" {
+		return c.CreatePRComment(org, repo, prNumber, desc)
+	}
+	return c.UpdatePRComment(org, repo, commentId, desc)
+}
+
+func parsePRNumber(org, repo string, s github.Status) (int, error) {
+	re := regexp.MustCompile(fmt.Sprintf("http.*/%s_%s/(.*)/%s/.*", org, repo, s.Context))
+	m := re.FindStringSubmatch(s.TargetURL)
+	if m != nil {
+		return strconv.Atoi(m[1])
+	}
+	return 0, fmt.Errorf("Can't parse pr number from url:%s", s.TargetURL)
+}
+
+func findCheckResultComment(botname, sha string, comments []github.IssueComment) (string, int) {
+	for i := len(comments) - 1; i >= 0; i-- {
+		comment := comments[i]
+		if comment.User.Login != botname {
+			continue
+		}
+
+		m := JobsResultNotificationRe.FindStringSubmatch(comment.Body)
+		if m != nil && m[2] == sha {
+			return m[1], comment.ID
+		}
+	}
+
+	return "", -1
+}
+
+func buildJobResultComment(s github.Status) string {
+	icon := ""
+	switch s.State {
+	case github.StatusPending:
+		icon = ":large_blue_circle:"
+	case github.StatusSuccess:
+		icon = ":white_check_mark:"
+	case github.StatusFailure:
+		icon = ":x:"
+	case github.StatusError:
+		icon = ":heavy_minus_sign:"
+	}
+
+	return fmt.Sprintf(jobResultNotification, icon, s.Context, s.Description, s.TargetURL)
+}
+
+func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) string {
+	jobComment := buildJobResultComment(jobStatus)
+
+	if jobsOldComment == "" {
+		return fmt.Sprintf(JobsResultNotification, jobComment, sha)
+	}
+
+	jobName := jobStatus.Context
+	spliter := "\n"
+	js := strings.Split(jobsOldComment, spliter)
+	for i, s := range js {
+		m := jobResultNotificationRe.FindStringSubmatch(s)
+		if m != nil && m[1] == jobName {
+			js[i] = jobComment
+			break
+		}
+	}
+
+	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), sha)
 }
