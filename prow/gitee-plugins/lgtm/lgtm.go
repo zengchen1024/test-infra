@@ -132,7 +132,7 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
 	}()
 
-	if *(e.State) != "open" {
+	if e.PullRequest.State != "open" {
 		log.Debug("Pull request state is not open, skipping...")
 		return nil
 	}
