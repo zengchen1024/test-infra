@@ -171,7 +171,8 @@ func (a *approve) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		return nil
 	}
 
-	if *(e.Action) != "open" && *(e.Action) != "update" {
+	action := plugins.ConvertPullRequestAction(e)
+	if !(action == github.PullRequestActionOpened || action == github.PullRequestActionSynchronize) {
 		log.Debug("Pull request event action cannot constitute approval, skipping...")
 		return nil
 	}

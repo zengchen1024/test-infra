@@ -64,7 +64,7 @@ func setPullRequestInfo(e *gitee.NoteEvent, gc *github.GenericCommentEvent) {
 func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent {
 	epr := e.PullRequest
 	pe := github.PullRequestEvent{
-		Action: convertPullRequestAction(e),
+		Action: ConvertPullRequestAction(e),
 		GUID:   "", //TODO
 		PullRequest: github.PullRequest{
 			Base: github.PullRequestBranch{
@@ -133,7 +133,7 @@ func convertPushCommits(e *gitee.PushEvent) []github.Commit {
 	return r
 }
 
-func convertPullRequestAction(e *gitee.PullRequestEvent) github.PullRequestEventAction {
+func ConvertPullRequestAction(e *gitee.PullRequestEvent) github.PullRequestEventAction {
 	var a github.PullRequestEventAction
 
 	switch strings.ToLower(*(e.Action)) {
