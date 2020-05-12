@@ -2,9 +2,12 @@ package trigger
 
 import (
 	"fmt"
+	"sort"
 
-	"gitee.com/openeuler/go-gitee/gitee"
+	sdk "gitee.com/openeuler/go-gitee/gitee"
+	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
+	reporter "k8s.io/test-infra/prow/job-reporter/gitee"
 )
 
 type giteeClient interface {
@@ -16,13 +19,13 @@ type giteeClient interface {
 	CreatePRComment(owner, repo string, number int, comment string) error
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
 	RemovePRLabel(org, repo string, number int, label string) error
-	GetPRLabels(org, repo string, number int) ([]gitee.Label, error)
+	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
+	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 }
-
-var _ githubClient = (*ghclient)(nil)
 
 type ghclient struct {
 	giteeClient
+	prNumber int
 }
 
 func (c *ghclient) GetIssueLabels(org, repo string, number int) ([]github.Label, error) {
@@ -40,7 +43,22 @@ func (c *ghclient) GetIssueLabels(org, repo string, number int) ([]github.Label,
 }
 
 func (c *ghclient) ListIssueComments(org, repo string, number int) ([]github.IssueComment, error) {
-	return nil, fmt.Errorf("ListIssueComments is not used in original trigger")
+	var r []github.IssueComment
+
+	v, err := c.ListPRComments(org, repo, number)
+	if err != nil {
+		return r, err
+	}
+
+	for _, i := range v {
+		r = append(r, gitee.ConvertGiteePRComment(i))
+	}
+
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i].CreatedAt.Before(r[j].CreatedAt)
+	})
+
+	return r, nil
 }
 
 func (c *ghclient) CreateComment(org, repo string, number int, comment string) error {
@@ -64,7 +82,19 @@ func (c *ghclient) CreateStatus(owner, repo, ref string, status github.Status) e
 }
 
 func (c *ghclient) GetCombinedStatus(org, repo, ref string) (*github.CombinedStatus, error) {
-	return nil, fmt.Errorf("GetCombinedStatus is not implemented")
+	comments, err := c.ListIssueComments(org, repo, c.prNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	botname, err := c.BotName()
+	if err != nil {
+		return nil, err
+	}
+
+	status := reporter.ParseCombinedStatus(botname, ref, comments)
+
+	return &github.CombinedStatus{Statuses: status}, nil
 }
 
 func (c *ghclient) DeleteStaleComments(org, repo string, number int, comments []github.IssueComment, isStale func(github.IssueComment) bool) error {

@@ -11,29 +11,11 @@ import (
 	prowConfig "k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/git/v2"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
-	"k8s.io/test-infra/prow/github"
-	"k8s.io/test-infra/prow/job-reporter"
+	reporter "k8s.io/test-infra/prow/job-reporter"
 	"k8s.io/test-infra/prow/pluginhelp"
 	originp "k8s.io/test-infra/prow/plugins"
 	origint "k8s.io/test-infra/prow/plugins/trigger"
 )
-
-type githubClient interface {
-	AddLabel(org, repo string, number int, label string) error
-	BotName() (string, error)
-	IsCollaborator(org, repo, user string) (bool, error)
-	IsMember(org, user string) (bool, error)
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
-	GetRef(org, repo, ref string) (string, error)
-	CreateComment(owner, repo string, number int, comment string) error
-	ListIssueComments(owner, repo string, issue int) ([]github.IssueComment, error)
-	CreateStatus(owner, repo, ref string, status github.Status) error
-	GetCombinedStatus(org, repo, ref string) (*github.CombinedStatus, error)
-	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	RemoveLabel(org, repo string, number int, label string) error
-	DeleteStaleComments(org, repo string, number int, comments []github.IssueComment, isStale func(github.IssueComment) bool) error
-	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
-}
 
 type prowJobClient interface {
 	Create(*prowapi.ProwJob) (*prowapi.ProwJob, error)
@@ -42,7 +24,8 @@ type prowJobClient interface {
 }
 
 type trigger struct {
-	ghc             githubClient
+	gec             giteeClient
+	ghc             *ghclient
 	pjc             prowJobClient
 	gitClient       git.ClientFactory
 	getProwConf     prowConfig.Getter
@@ -51,6 +34,7 @@ type trigger struct {
 
 func NewTrigger(f plugins.GetPluginConfig, f1 prowConfig.Getter, gec giteeClient, pjc prowJobClient, gitc git.ClientFactory) plugins.Plugin {
 	return &trigger{
+		gec:             gec,
 		ghc:             &ghclient{giteeClient: gec},
 		pjc:             pjc,
 		gitClient:       gitc,
@@ -94,10 +78,12 @@ func (t *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return err
 	}
 
-	return origint.HandleGenericComment(
-		t.buildOriginClient(log),
-		c,
-		plugins.NoteEventToCommentEvent(e))
+	ge := plugins.NoteEventToCommentEvent(e)
+
+	cl := t.buildOriginClient(log)
+	cl.GitHubClient = &ghclient{giteeClient: t.gec, prNumber: ge.Number}
+
+	return origint.HandleGenericComment(cl, c, ge)
 }
 
 func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {

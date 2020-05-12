@@ -18,6 +18,7 @@ var (
 	JobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf(JobsResultNotification, "(.*)", "(.*)"))
 	jobResultNotification    = "%s %s — %s [Details](%s)"
 	jobResultNotificationRe  = regexp.MustCompile(fmt.Sprintf("%s %s — %s \\[Details\\]\\(%s\\)", ".*", "(.*)", ".*", ".*"))
+	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("%s %s — %s \\[Details\\]\\(%s\\)", "(.*)", "(.*)", "(.*)", "(.*)"))
 )
 
 type giteeClient interface {
@@ -133,6 +134,20 @@ func buildJobResultComment(s github.Status) string {
 	return fmt.Sprintf(jobResultNotification, icon, s.Context, s.Description, s.TargetURL)
 }
 
+func iconToState(icon string) string {
+	switch icon {
+	case ":large_blue_circle:":
+		return github.StatusPending
+	case ":white_check_mark:":
+		return github.StatusSuccess
+	case ":x:":
+		return github.StatusFailure
+	case ":heavy_minus_sign:":
+		return github.StatusError
+	}
+	return ""
+}
+
 func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) string {
 	jobComment := buildJobResultComment(jobStatus)
 
@@ -152,4 +167,26 @@ func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) st
 	}
 
 	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), sha)
+}
+
+func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
+	jobsComment, _ := findCheckResultComment(botname, sha, comments)
+	if jobsComment == "" {
+		return []github.Status{}
+	}
+
+	js := strings.Split(jobsComment, "\n")
+	r := make([]github.Status, 0, len(js))
+	for _, s := range js {
+		m := jobResultEachPartRe.FindStringSubmatch(s)
+		if m != nil {
+			r = append(r, github.Status{
+				State:       iconToState(m[1]),
+				Context:     m[2],
+				Description: m[3],
+				TargetURL:   m[4],
+			})
+		}
+	}
+	return r
 }
