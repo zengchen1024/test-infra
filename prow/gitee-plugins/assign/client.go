@@ -18,8 +18,6 @@ type giteeClient interface {
 	CreateGiteeIssueComment(owner, repo string, number string, comment string) error
 }
 
-var _ githubClient = (*ghclient)(nil)
-
 type ghclient struct {
 	giteeClient
 	e *sdk.NoteEvent

@@ -14,16 +14,6 @@ import (
 	origina "k8s.io/test-infra/prow/plugins/assign"
 )
 
-type githubClient interface {
-	AssignIssue(owner, repo string, number int, logins []string) error
-	UnassignIssue(owner, repo string, number int, logins []string) error
-
-	RequestReview(org, repo string, number int, logins []string) error
-	UnrequestReview(org, repo string, number int, logins []string) error
-
-	CreateComment(owner, repo string, number int, comment string) error
-}
-
 type assign struct {
 	getPluginConfig plugins.GetPluginConfig
 	gec             giteeClient

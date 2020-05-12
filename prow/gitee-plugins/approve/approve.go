@@ -23,28 +23,13 @@ const (
 	lgtmCommand    = "LGTM"
 )
 
-type githubClient interface {
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
-	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
-	ListIssueComments(org, repo string, number int) ([]github.IssueComment, error)
-	ListReviews(org, repo string, number int) ([]github.Review, error)
-	ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error)
-	DeleteComment(org, repo string, ID int) error
-	CreateComment(org, repo string, number int, comment string) error
-	BotName() (string, error)
-	AddLabel(org, repo string, number int, label string) error
-	RemoveLabel(org, repo string, number int, label string) error
-	ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error)
-}
-
 type ownersClient interface {
 	LoadRepoOwners(org, repo, base string) (repoowners.RepoOwner, error)
 }
 
 type approve struct {
 	getPluginConfig plugins.GetPluginConfig
-	ghc             githubClient
+	ghc             *ghclient
 	oc              ownersClient
 }
 

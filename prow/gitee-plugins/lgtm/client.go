@@ -24,8 +24,6 @@ type giteeClient interface {
 	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
 }
 
-var _ githubClient = (*ghclient)(nil)
-
 type ghclient struct {
 	giteeClient
 }
