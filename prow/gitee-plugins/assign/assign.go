@@ -45,7 +45,7 @@ func (a *assign) PluginName() string {
 }
 
 func (a *assign) NewPluginConfig() plugins.PluginConfig {
-	return &configuration{}
+	return nil
 }
 
 func (a *assign) RegisterEventHandler(p plugins.Plugins) {

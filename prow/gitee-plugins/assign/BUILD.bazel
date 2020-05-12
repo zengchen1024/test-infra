@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "assign.go",
         "client.go",
-        "config.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins/assign",
     visibility = ["//visibility:public"],
