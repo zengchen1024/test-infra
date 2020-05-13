@@ -22,9 +22,34 @@ func ConvertGiteePRComment(i sdk.PullRequestComments) github.IssueComment {
 }
 
 func ConvertGiteePR(v *sdk.PullRequest) *github.PullRequest {
-	var r github.PullRequest
-	r.Head.SHA = v.Head.Sha
-	r.Head.Ref = v.Head.Ref
-	r.Base.Ref = v.Base.Ref
+	r := github.PullRequest{
+		Head: github.PullRequestBranch{
+			SHA: v.Head.Sha,
+			Ref: v.Head.Ref,
+		},
+		Base: github.PullRequestBranch{
+			Ref: v.Base.Ref,
+			SHA: v.Base.Sha,
+			Repo: github.Repo{
+				Name: v.Base.Repo.Name,
+				Owner: github.User{
+					Login: v.Base.Repo.Owner.Login,
+				},
+				HTMLURL:  v.Base.Repo.HtmlUrl,
+				FullName: v.Base.Repo.FullName,
+			},
+		},
+		User: github.User{
+			Login:   v.User.Login,
+			HTMLURL: v.User.HtmlUrl,
+		},
+
+		Number:  int(v.Number),
+		HTMLURL: v.HtmlUrl,
+		State:   v.State,
+		Body:    v.Body,
+		Title:   v.Title,
+		ID:      int(v.Id),
+	}
 	return &r
 }

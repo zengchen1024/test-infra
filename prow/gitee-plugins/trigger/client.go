@@ -18,6 +18,7 @@ type giteeClient interface {
 	GetRef(org, repo, ref string) (string, error)
 	CreatePRComment(owner, repo string, number int, comment string) error
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
+	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 	RemovePRLabel(org, repo string, number int, label string) error
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
@@ -74,7 +75,12 @@ func (c *ghclient) RemoveLabel(org, repo string, number int, label string) error
 }
 
 func (c *ghclient) GetPullRequest(org, repo string, number int) (*github.PullRequest, error) {
-	return nil, fmt.Errorf("GetPullRequest is not used in original trigger")
+	v, err := c.GetGiteePullRequest(org, repo, number)
+	if err != nil {
+		return nil, err
+	}
+
+	return gitee.ConvertGiteePR(&v), nil
 }
 
 func (c *ghclient) CreateStatus(owner, repo, ref string, status github.Status) error {

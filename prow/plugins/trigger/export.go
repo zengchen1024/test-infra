@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	HelpProvider         = helpProvider
-	HandleGenericComment = handleGenericComment
+	HelpProvider = helpProvider
 )
 
 func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, setPresubmit func([]config.Presubmit)) error {
@@ -166,4 +165,112 @@ func HandlePE(c Client, pe github.PushEvent, setPostsubmit func([]config.Postsub
 		}
 	}
 	return nil
+}
+
+func HandleGenericComment(c Client, trigger plugins.Trigger, gc github.GenericCommentEvent, setPresubmit func([]config.Presubmit)) error {
+	org := gc.Repo.Owner.Login
+	repo := gc.Repo.Name
+	number := gc.Number
+	commentAuthor := gc.User.Login
+	// Only take action when a comment is first created,
+	// when it belongs to a PR,
+	// and the PR is open.
+	if gc.Action != github.GenericCommentActionCreated || !gc.IsPR || gc.IssueState != "open" {
+		return nil
+	}
+
+	// Skip bot comments.
+	botName, err := c.GitHubClient.BotName()
+	if err != nil {
+		return err
+	}
+	if commentAuthor == botName {
+		c.Logger.Debug("Comment is made by the bot, skipping.")
+		return nil
+	}
+
+	refGetter := config.NewRefGetterForGitHubPullRequest(c.GitHubClient, org, repo, number)
+	presubmits := getPresubmits(c.Logger, c.GitClient, c.Config, org+"/"+repo, refGetter.BaseSHA, refGetter.HeadSHA)
+	if len(presubmits) == 0 {
+		return nil
+	}
+	if setPresubmit != nil {
+		setPresubmit(presubmits)
+	}
+
+	// Skip comments not germane to this plugin
+	if !pjutil.RetestRe.MatchString(gc.Body) &&
+		!pjutil.OkToTestRe.MatchString(gc.Body) &&
+		!pjutil.TestAllRe.MatchString(gc.Body) &&
+		!mayNeedHelpComment(gc.Body) {
+		matched := false
+		for _, presubmit := range presubmits {
+			matched = matched || presubmit.TriggerMatches(gc.Body)
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			c.Logger.Debug("Comment doesn't match any triggering regex, skipping.")
+			return nil
+		}
+	}
+
+	// Skip untrusted users comments.
+	trusted, err := TrustedUser(c.GitHubClient, trigger.OnlyOrgMembers, trigger.TrustedOrg, commentAuthor, org, repo)
+	if err != nil {
+		return fmt.Errorf("error checking trust of %s: %v", commentAuthor, err)
+	}
+	var l []github.Label
+	if !trusted {
+		// Skip untrusted PRs.
+		l, trusted, err = TrustedPullRequest(c.GitHubClient, trigger, gc.IssueAuthor.Login, org, repo, number, nil)
+		if err != nil {
+			return err
+		}
+		if !trusted {
+			resp := fmt.Sprintf("Cannot trigger testing until a trusted user reviews the PR and leaves an `/ok-to-test` message.")
+			c.Logger.Infof("Commenting \"%s\".", resp)
+			return c.GitHubClient.CreateComment(org, repo, number, plugins.FormatResponseRaw(gc.Body, gc.HTMLURL, gc.User.Login, resp))
+		}
+	}
+
+	// At this point we can trust the PR, so we eventually update labels.
+	// Ensure we have labels before test, because TrustedPullRequest() won't be called
+	// when commentAuthor is trusted.
+	if l == nil {
+		l, err = c.GitHubClient.GetIssueLabels(org, repo, number)
+		if err != nil {
+			return err
+		}
+	}
+	isOkToTest := HonorOkToTest(trigger) && pjutil.OkToTestRe.MatchString(gc.Body)
+	if isOkToTest && !github.HasLabel(labels.OkToTest, l) {
+		if err := c.GitHubClient.AddLabel(org, repo, number, labels.OkToTest); err != nil {
+			return err
+		}
+	}
+	if (isOkToTest || github.HasLabel(labels.OkToTest, l)) && github.HasLabel(labels.NeedsOkToTest, l) {
+		if err := c.GitHubClient.RemoveLabel(org, repo, number, labels.NeedsOkToTest); err != nil {
+			return err
+		}
+	}
+
+	pr, err := refGetter.PullRequest()
+	if err != nil {
+		return err
+	}
+	baseSHA, err := refGetter.BaseSHA()
+	if err != nil {
+		return err
+	}
+
+	toTest, err := FilterPresubmits(HonorOkToTest(trigger), c.GitHubClient, gc.Body, pr, presubmits, c.Logger)
+	if err != nil {
+		return err
+	}
+	if needsHelp, note := shouldRespondWithHelp(gc.Body, len(toTest)); needsHelp {
+		return addHelpComment(c.GitHubClient, gc.Body, org, repo, pr.Base.Ref, pr.Number, presubmits, gc.HTMLURL, commentAuthor, note, c.Logger)
+	}
+	return RunRequested(c, pr, baseSHA, toTest, gc.GUID)
 }

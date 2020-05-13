@@ -83,7 +83,12 @@ func (t *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	cl := t.buildOriginClient(log)
 	cl.GitHubClient = &ghclient{giteeClient: t.gec, prNumber: ge.Number}
 
-	return origint.HandleGenericComment(cl, c, ge)
+	return origint.HandleGenericComment(
+		cl, c, ge,
+		func(m []prowConfig.Presubmit) {
+			setPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+		},
+	)
 }
 
 func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
