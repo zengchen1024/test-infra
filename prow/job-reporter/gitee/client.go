@@ -34,6 +34,7 @@ var _ report.GitHubClient = (*ghclient)(nil)
 
 type ghclient struct {
 	giteeClient
+	prNumber int
 }
 
 func (c *ghclient) ListIssueComments(org, repo string, number int) ([]github.IssueComment, error) {
@@ -68,9 +69,13 @@ func (c *ghclient) EditComment(org, repo string, ID int, comment string) error {
 }
 
 func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
-	prNumber, err := parsePRNumber(org, repo, s)
-	if err != nil {
-		return err
+	prNumber := c.prNumber
+	var err error
+	if prNumber <= 0 {
+		prNumber, err = parsePRNumber(org, repo, s)
+		if err != nil {
+			return err
+		}
 	}
 
 	comments, err := c.ListIssueComments(org, repo, prNumber)
@@ -119,8 +124,13 @@ func findCheckResultComment(botname, sha string, comments []github.IssueComment)
 }
 
 func buildJobResultComment(s github.Status) string {
+	icon := stateToIcon(s.State)
+	return fmt.Sprintf(jobResultNotification, icon, s.Context, s.Description, s.TargetURL)
+}
+
+func stateToIcon(state string) string {
 	icon := ""
-	switch s.State {
+	switch state {
 	case github.StatusPending:
 		icon = ":large_blue_circle:"
 	case github.StatusSuccess:
@@ -130,8 +140,7 @@ func buildJobResultComment(s github.Status) string {
 	case github.StatusError:
 		icon = ":heavy_minus_sign:"
 	}
-
-	return fmt.Sprintf(jobResultNotification, icon, s.Context, s.Description, s.TargetURL)
+	return icon
 }
 
 func iconToState(icon string) string {
@@ -158,12 +167,17 @@ func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) st
 	jobName := jobStatus.Context
 	spliter := "\n"
 	js := strings.Split(jobsOldComment, spliter)
+	bingo := false
 	for i, s := range js {
 		m := jobResultNotificationRe.FindStringSubmatch(s)
 		if m != nil && m[1] == jobName {
 			js[i] = jobComment
+			bingo = true
 			break
 		}
+	}
+	if !bingo {
+		js = append(js, jobComment)
 	}
 
 	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), sha)

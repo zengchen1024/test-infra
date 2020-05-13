@@ -10,12 +10,13 @@ import (
 type reporter struct {
 	c   *github.Client
 	ghc *ghclient
+	gec giteeClient
 }
 
-func NewReporter(gc giteeClient, cfg config.Getter, reportAgent v1.ProwJobAgent) *reporter {
-	ghc := &ghclient{giteeClient: gc}
+func NewReporter(gec giteeClient, cfg config.Getter, reportAgent v1.ProwJobAgent) *reporter {
+	ghc := &ghclient{giteeClient: gec}
 	c := github.NewReporter(ghc, cfg, reportAgent)
-	return &reporter{c: c, ghc: ghc}
+	return &reporter{c: c, ghc: ghc, gec: gec}
 }
 
 // GetName returns the name of the reporter
@@ -39,6 +40,10 @@ func (r *reporter) ShouldReport(pj *v1.ProwJob) bool {
 }
 
 func (r *reporter) Report(pj *v1.ProwJob) ([]*v1.ProwJob, error) {
+	if pj.Spec.Refs.Pulls != nil && len(pj.Spec.Refs.Pulls) == 1 {
+		return r.c.Report1(pj, &ghclient{giteeClient: r.gec, prNumber: pj.Spec.Refs.Pulls[0].Number})
+	}
+
 	return r.c.Report(pj)
 }
 
