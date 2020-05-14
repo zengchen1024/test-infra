@@ -14,11 +14,10 @@ import (
 )
 
 var (
-	JobsResultNotification   = "Checks Results.\n%s\n  <details>Git tree hash: %s</details>"
-	JobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf(JobsResultNotification, "(.*)", "(.*)"))
-	jobResultNotification    = "%s %s — %s [Details](%s)"
-	jobResultNotificationRe  = regexp.MustCompile(fmt.Sprintf("%s %s — %s \\[Details\\]\\(%s\\)", ".*", "(.*)", ".*", ".*"))
-	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("%s %s — %s \\[Details\\]\\(%s\\)", "(.*)", "(.*)", "(.*)", "(.*)"))
+	JobsResultNotification   = "| Check Name | Result | Details |\n| --- | --- | --- |\n%s\n  <details>Git tree hash: %s</details>"
+	JobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
+	jobResultNotification    = "| %s %s | %s | [details](%s) |"
+	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
 )
 
 type giteeClient interface {
@@ -169,8 +168,8 @@ func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) st
 	js := strings.Split(jobsOldComment, spliter)
 	bingo := false
 	for i, s := range js {
-		m := jobResultNotificationRe.FindStringSubmatch(s)
-		if m != nil && m[1] == jobName {
+		m := jobResultEachPartRe.FindStringSubmatch(s)
+		if m != nil && m[2] == jobName {
 			js[i] = jobComment
 			bingo = true
 			break
