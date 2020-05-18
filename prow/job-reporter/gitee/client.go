@@ -77,6 +77,16 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 		}
 	}
 
+	pr, err := c.GetGiteePullRequest(org, repo, prNumber)
+	if err != nil {
+		return err
+	}
+	if ref != pr.Head.Sha {
+		// Secondly check whether the status is for the newest commit, if not, skip.
+		// This check is for the case that two updates for pr happend very closely.
+		return nil
+	}
+
 	comments, err := c.ListIssueComments(org, repo, prNumber)
 	if err != nil {
 		return err
@@ -87,11 +97,14 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 		return err
 	}
 
-	jobsOldComment, commentId := findCheckResultComment(botname, ref, comments)
+	// find the old comment even if it is not for the current commit in order to
+	// write the comment at the fixed position.
+	jobsOldComment, oldSha, commentId := findCheckResultComment(botname, comments)
 
-	desc := genJobResultComment(jobsOldComment, ref, s)
+	desc := genJobResultComment(jobsOldComment, oldSha, ref, s)
 
-	if jobsOldComment == "" {
+	// oldSha == "" means there is not status comment exist.
+	if oldSha == "" {
 		return c.CreatePRComment(org, repo, prNumber, desc)
 	}
 	return c.UpdatePRComment(org, repo, commentId, desc)
@@ -106,7 +119,8 @@ func parsePRNumber(org, repo string, s github.Status) (int, error) {
 	return 0, fmt.Errorf("Can't parse pr number from url:%s", s.TargetURL)
 }
 
-func findCheckResultComment(botname, sha string, comments []github.IssueComment) (string, int) {
+// At any time, there is only one status comment. Because it writed status comment Serially
+func findCheckResultComment(botname string, comments []github.IssueComment) (string, string, int) {
 	for i := len(comments) - 1; i >= 0; i-- {
 		comment := comments[i]
 		if comment.User.Login != botname {
@@ -114,12 +128,12 @@ func findCheckResultComment(botname, sha string, comments []github.IssueComment)
 		}
 
 		m := JobsResultNotificationRe.FindStringSubmatch(comment.Body)
-		if m != nil && m[2] == sha {
-			return m[1], comment.ID
+		if m != nil {
+			return m[1], m[2], comment.ID
 		}
 	}
 
-	return "", -1
+	return "", "", -1
 }
 
 func buildJobResultComment(s github.Status) string {
@@ -156,11 +170,12 @@ func iconToState(icon string) string {
 	return ""
 }
 
-func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) string {
+func genJobResultComment(jobsOldComment, oldSha, newSha string, jobStatus github.Status) string {
 	jobComment := buildJobResultComment(jobStatus)
 
-	if jobsOldComment == "" {
-		return fmt.Sprintf(JobsResultNotification, jobComment, sha)
+	if oldSha != newSha {
+		// override the old comment
+		return fmt.Sprintf(JobsResultNotification, jobComment, newSha)
 	}
 
 	jobName := jobStatus.Context
@@ -179,12 +194,12 @@ func genJobResultComment(jobsOldComment, sha string, jobStatus github.Status) st
 		js = append(js, jobComment)
 	}
 
-	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), sha)
+	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), newSha)
 }
 
 func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
-	jobsComment, _ := findCheckResultComment(botname, sha, comments)
-	if jobsComment == "" {
+	jobsComment, oldSha, _ := findCheckResultComment(botname, comments)
+	if oldSha != sha {
 		return []github.Status{}
 	}
 

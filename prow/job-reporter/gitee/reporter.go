@@ -31,8 +31,6 @@ func (r *reporter) ShouldReport(pj *v1.ProwJob) bool {
 			if isForTheNewestCommit(r.ghc, pj) {
 				return r.c.ShouldReport(pj)
 			}
-
-			deleteOldJobsResultComment(r.ghc, pj)
 		}
 	}
 
@@ -59,30 +57,4 @@ func isForTheNewestCommit(ghc *ghclient, pj *v1.ProwJob) bool {
 		}
 	}
 	return true
-}
-
-func deleteOldJobsResultComment(ghc *ghclient, pj *v1.ProwJob) error {
-	refs := pj.Spec.Refs
-	if len(refs.Pulls) == 1 {
-		org := refs.Org
-		repo := refs.Repo
-		sha := refs.Pulls[0].SHA
-		prNumber := refs.Pulls[0].Number
-
-		comments, err := ghc.ListIssueComments(org, repo, prNumber)
-		if err != nil {
-			return err
-		}
-
-		botname, err := ghc.BotName()
-		if err != nil {
-			return err
-		}
-
-		v, commentId := findCheckResultComment(botname, sha, comments)
-		if v != "" {
-			return ghc.DeletePRComment(org, repo, commentId)
-		}
-	}
-	return nil
 }
