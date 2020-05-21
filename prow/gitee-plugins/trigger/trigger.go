@@ -86,7 +86,7 @@ func (t *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	return origint.HandleGenericComment(
 		cl, c, ge,
 		func(m []prowConfig.Presubmit) {
-			setPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+			SetPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
 		},
 	)
 }
@@ -107,7 +107,7 @@ func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		c,
 		plugins.ConvertPullRequestEvent(e),
 		func(m []prowConfig.Presubmit) {
-			setPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+			SetPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
 		},
 	)
 }
@@ -163,7 +163,7 @@ func (t *trigger) buildOriginClient(log *logrus.Entry) origint.Client {
 	}
 }
 
-func setPresubmit(org, repo string, m []prowConfig.Presubmit) {
+func SetPresubmit(org, repo string, m []prowConfig.Presubmit) {
 	/* can't write as this, or the JobBase can't be changed
 	for _, i := range m {
 		setJob(org, repo, &i.JobBase)
