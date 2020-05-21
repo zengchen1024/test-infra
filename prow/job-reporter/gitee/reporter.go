@@ -25,12 +25,10 @@ func (r *reporter) GetName() string {
 }
 
 func (r *reporter) ShouldReport(pj *v1.ProwJob) bool {
-	if pj.Annotations != nil {
-		if v, ok := pj.Annotations[jobreporter.JobPlatformAnnotation]; ok && (v == "gitee") {
-			// only report status for the newest commit
-			if isForTheNewestCommit(r.ghc, pj) {
-				return r.c.ShouldReport(pj)
-			}
+	if IsGiteeJob(pj) {
+		// only report status for the newest commit
+		if isForTheNewestCommit(r.ghc, pj) {
+			return r.c.ShouldReport(pj)
 		}
 	}
 
@@ -43,6 +41,15 @@ func (r *reporter) Report(pj *v1.ProwJob) ([]*v1.ProwJob, error) {
 	}
 
 	return r.c.Report(pj)
+}
+
+func IsGiteeJob(pj *v1.ProwJob) bool {
+	if pj.Annotations != nil {
+		if v, ok := pj.Annotations[jobreporter.JobPlatformAnnotation]; ok {
+			return  (v == "gitee")
+		}
+	}
+	return false
 }
 
 func isForTheNewestCommit(ghc *ghclient, pj *v1.ProwJob) bool {

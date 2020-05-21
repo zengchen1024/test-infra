@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/test-infra/prow/gitee"
@@ -14,8 +13,8 @@ import (
 )
 
 var (
-	JobsResultNotification   = "| Check Name | Result | Details |\n| --- | --- | --- |\n%s\n  <details>Git tree hash: %s</details>"
-	JobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
+	jobsResultNotification   = "| Check Name | Result | Details |\n| --- | --- | --- |\n%s\n  <details>Git tree hash: %s</details>"
+	jobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
 	jobResultNotification    = "| %s %s | %s | [details](%s) |"
 	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
 )
@@ -97,11 +96,17 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 		return err
 	}
 
+	jsc := JobStatusComment{
+		JobsResultNotification:   jobsResultNotification,
+		JobsResultNotificationRe: jobsResultNotificationRe,
+		JobResultNotification:    jobResultNotification,
+		JobResultNotificationRe:  jobResultEachPartRe,
+	}
 	// find the old comment even if it is not for the current commit in order to
 	// write the comment at the fixed position.
-	jobsOldComment, oldSha, commentId := findCheckResultComment(botname, comments)
+	jobsOldComment, oldSha, commentId := jsc.FindCheckResultComment(botname, comments)
 
-	desc := genJobResultComment(jobsOldComment, oldSha, ref, s)
+	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
 
 	// oldSha == "" means there is not status comment exist.
 	if oldSha == "" {
@@ -119,102 +124,12 @@ func parsePRNumber(org, repo string, s github.Status) (int, error) {
 	return 0, fmt.Errorf("Can't parse pr number from url:%s", s.TargetURL)
 }
 
-// At any time, there is only one status comment. Because it writed status comment Serially
-func findCheckResultComment(botname string, comments []github.IssueComment) (string, string, int) {
-	for i := len(comments) - 1; i >= 0; i-- {
-		comment := comments[i]
-		if comment.User.Login != botname {
-			continue
-		}
-
-		m := JobsResultNotificationRe.FindStringSubmatch(comment.Body)
-		if m != nil {
-			return m[1], m[2], comment.ID
-		}
-	}
-
-	return "", "", -1
-}
-
-func buildJobResultComment(s github.Status) string {
-	icon := stateToIcon(s.State)
-	return fmt.Sprintf(jobResultNotification, icon, s.Context, s.Description, s.TargetURL)
-}
-
-func stateToIcon(state string) string {
-	icon := ""
-	switch state {
-	case github.StatusPending:
-		icon = ":large_blue_circle:"
-	case github.StatusSuccess:
-		icon = ":white_check_mark:"
-	case github.StatusFailure:
-		icon = ":x:"
-	case github.StatusError:
-		icon = ":heavy_minus_sign:"
-	}
-	return icon
-}
-
-func iconToState(icon string) string {
-	switch icon {
-	case ":large_blue_circle:":
-		return github.StatusPending
-	case ":white_check_mark:":
-		return github.StatusSuccess
-	case ":x:":
-		return github.StatusFailure
-	case ":heavy_minus_sign:":
-		return github.StatusError
-	}
-	return ""
-}
-
-func genJobResultComment(jobsOldComment, oldSha, newSha string, jobStatus github.Status) string {
-	jobComment := buildJobResultComment(jobStatus)
-
-	if oldSha != newSha {
-		// override the old comment
-		return fmt.Sprintf(JobsResultNotification, jobComment, newSha)
-	}
-
-	jobName := jobStatus.Context
-	spliter := "\n"
-	js := strings.Split(jobsOldComment, spliter)
-	bingo := false
-	for i, s := range js {
-		m := jobResultEachPartRe.FindStringSubmatch(s)
-		if m != nil && m[2] == jobName {
-			js[i] = jobComment
-			bingo = true
-			break
-		}
-	}
-	if !bingo {
-		js = append(js, jobComment)
-	}
-
-	return fmt.Sprintf(JobsResultNotification, strings.Join(js, spliter), newSha)
-}
-
 func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
-	jobsComment, oldSha, _ := findCheckResultComment(botname, comments)
-	if oldSha != sha {
-		return []github.Status{}
+	jsc := JobStatusComment{
+		JobsResultNotification:   jobsResultNotification,
+		JobsResultNotificationRe: jobsResultNotificationRe,
+		JobResultNotification:    jobResultNotification,
+		JobResultNotificationRe:  jobResultEachPartRe,
 	}
-
-	js := strings.Split(jobsComment, "\n")
-	r := make([]github.Status, 0, len(js))
-	for _, s := range js {
-		m := jobResultEachPartRe.FindStringSubmatch(s)
-		if m != nil {
-			r = append(r, github.Status{
-				State:       iconToState(m[1]),
-				Context:     m[2],
-				Description: m[3],
-				TargetURL:   m[4],
-			})
-		}
-	}
-	return r
+	return jsc.ParseCombinedStatus(botname, sha, comments)
 }

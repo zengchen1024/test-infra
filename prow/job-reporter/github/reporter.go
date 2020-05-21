@@ -22,15 +22,22 @@ func (r *reporter) GetName() string {
 }
 
 func (r *reporter) ShouldReport(pj *v1.ProwJob) bool {
-	if pj.Annotations != nil {
-		if v, ok := pj.Annotations[jobreporter.JobPlatformAnnotation]; ok && (v != "github") {
-			return false
-		}
+	if IsGithubJob(pj) {
+		return r.c.ShouldReport(pj)
 	}
 
-	return r.c.ShouldReport(pj)
+	return false
 }
 
 func (r *reporter) Report(pj *v1.ProwJob) ([]*v1.ProwJob, error) {
 	return r.c.Report(pj)
+}
+
+func IsGithubJob(pj *v1.ProwJob) bool {
+	if pj.Annotations != nil {
+		if v, ok := pj.Annotations[jobreporter.JobPlatformAnnotation]; ok {
+			return (v == "github")
+		}
+	}
+	return true
 }
