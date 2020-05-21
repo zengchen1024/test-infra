@@ -97,7 +97,7 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	comment := e.Comment
 	rc := originl.NewReviewCtx(
-		comment.User.Login, pr.User.Login, comment.Body,
+		comment.User.Login, pr.Head.User.Login, comment.Body,
 		comment.HtmlUrl, repo, assignees, int(pr.Number))
 
 	cp := commentpruner.NewEventClient(
@@ -131,10 +131,10 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 
 	pr := e.PullRequest
 	var pe github.PullRequestEvent
-	pe.Action = github.PullRequestActionSynchronize
+	pe.Action = plugins.ConvertPullRequestAction(e)
 	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Owner.Login
 	pe.PullRequest.Base.Repo.Name = pr.Base.Repo.Name
-	pe.PullRequest.User.Login = pr.User.Login
+	pe.PullRequest.User.Login = pr.Head.User.Login
 	pe.PullRequest.Number = int(pr.Number)
 	pe.PullRequest.Head.SHA = pr.Head.Sha
 
