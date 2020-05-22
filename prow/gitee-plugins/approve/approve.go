@@ -23,28 +23,13 @@ const (
 	lgtmCommand    = "LGTM"
 )
 
-type githubClient interface {
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
-	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
-	ListIssueComments(org, repo string, number int) ([]github.IssueComment, error)
-	ListReviews(org, repo string, number int) ([]github.Review, error)
-	ListPullRequestComments(org, repo string, number int) ([]github.ReviewComment, error)
-	DeleteComment(org, repo string, ID int) error
-	CreateComment(org, repo string, number int, comment string) error
-	BotName() (string, error)
-	AddLabel(org, repo string, number int, label string) error
-	RemoveLabel(org, repo string, number int, label string) error
-	ListIssueEvents(org, repo string, num int) ([]github.ListedIssueEvent, error)
-}
-
 type ownersClient interface {
 	LoadRepoOwners(org, repo, base string) (repoowners.RepoOwner, error)
 }
 
 type approve struct {
 	getPluginConfig plugins.GetPluginConfig
-	ghc             githubClient
+	ghc             *ghclient
 	oc              ownersClient
 }
 
@@ -156,7 +141,7 @@ func (a *approve) handle(org, repo string, pr *sdk.PullRequestHook, log *logrus.
 		repoc,
 		getGiteeOption(),
 		c,
-		origina.NewState(org, repo, pr.Base.Ref, pr.Body, pr.User.Login, pr.HtmlUrl, int(pr.Number), assignees),
+		origina.NewState(org, repo, pr.Base.Ref, pr.Body, pr.Head.User.Login, pr.HtmlUrl, int(pr.Number), assignees),
 	)
 }
 
@@ -166,12 +151,13 @@ func (a *approve) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
 	}()
 
-	if *(e.State) != "open" {
+	if e.PullRequest.State != "open" {
 		log.Debug("Pull request state is not open, skipping...")
 		return nil
 	}
 
-	if *(e.Action) != "open" && *(e.Action) != "update" {
+	action := plugins.ConvertPullRequestAction(e)
+	if !(action == github.PullRequestActionOpened || action == github.PullRequestActionSynchronize) {
 		log.Debug("Pull request event action cannot constitute approval, skipping...")
 		return nil
 	}
