@@ -31,7 +31,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilpointer "k8s.io/utils/pointer"
 
-	pkgio "k8s.io/test-infra/pkg/io"
+	pkgio "k8s.io/test-infra/prow/io"
+	"k8s.io/test-infra/prow/io/providers"
 )
 
 // UploadFunc knows how to upload into an object
@@ -46,22 +47,8 @@ func Upload(bucket, gcsCredentialsFile, s3CredentialsFile string, uploadTargets 
 	if err != nil {
 		return fmt.Errorf("cannot parse bucket name %s: %v", bucket, err)
 	}
-	if parsedBucket.Scheme == "" || parsedBucket.Scheme == "gs" {
-		if parsedBucket.Scheme == "gs" {
-			bucket = strings.Trim(bucket, "gs://")
-		}
-		var options []option.ClientOption
-		if gcsCredentialsFile != "" {
-			options = append(options, option.WithCredentialsFile(gcsCredentialsFile))
-		}
-		gcsClient, err := storage.NewClient(context.Background(), options...)
-		if err != nil {
-			return fmt.Errorf("create client: %w", err)
-		}
-		dtw := func(dest string) dataWriter {
-			return gcsObjectWriter{gcsClient.Bucket(bucket).Object(dest).NewWriter(context.Background())}
-		}
-		return upload(dtw, uploadTargets)
+	if parsedBucket.Scheme == "" {
+		parsedBucket.Scheme = providers.GS
 	}
 
 	ctx := context.Background()

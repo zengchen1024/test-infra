@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	prowapi "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	reporter "k8s.io/test-infra/prow/crier/reporters/github"
@@ -39,7 +41,6 @@ import (
 	"k8s.io/test-infra/prow/kube"
 	"k8s.io/test-infra/prow/pjutil"
 	"k8s.io/test-infra/prow/pod-utils/decorate"
-	ctrlruntimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // PodStatus constants
@@ -497,8 +498,11 @@ func (c *Controller) syncPendingJob(pj prowapi.ProwJob, pm map[string]corev1.Pod
 			return nil
 		}
 	}
-
-	pj.Status.URL = pjutil.JobURL(c.config().Plank, pj, c.log)
+	var err error
+	pj.Status.URL, err = pjutil.JobURL(c.config().Plank, pj, c.log)
+	if err != nil {
+		c.log.WithFields(pjutil.ProwJobFields(&pj)).WithError(err).Error("Error calculating job status url")
+	}
 
 	reports <- pj
 
@@ -572,7 +576,11 @@ func (c *Controller) syncTriggeredJob(pj prowapi.ProwJob, pm map[string]corev1.P
 		pj.Status.State = prowapi.PendingState
 		pj.Status.PodName = pn
 		pj.Status.Description = "Job triggered."
-		pj.Status.URL = pjutil.JobURL(c.config().Plank, pj, c.log)
+		var err error
+		pj.Status.URL, err = pjutil.JobURL(c.config().Plank, pj, c.log)
+		if err != nil {
+			return err
+		}
 	}
 	reports <- pj
 	if prevState != pj.Status.State {

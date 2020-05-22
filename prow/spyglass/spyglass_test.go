@@ -35,9 +35,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	tgconf "github.com/GoogleCloudPlatform/testgrid/pb/config"
+
 	prowapi "k8s.io/test-infra/prow/apis/prowjobs/v1"
 	"k8s.io/test-infra/prow/config"
 	"k8s.io/test-infra/prow/deck/jobs"
+	"k8s.io/test-infra/prow/io"
 	"k8s.io/test-infra/prow/kube"
 	"k8s.io/test-infra/prow/spyglass/lenses"
 )
@@ -243,7 +245,7 @@ func TestViews(t *testing.T) {
 					},
 				},
 			}
-			sg := New(context.Background(), fakeJa, c.Config, fakeGCSClient, "", false)
+			sg := New(context.Background(), fakeJa, c.Config, io.NewGCSOpener(fakeGCSClient), false)
 			_, ls := sg.Lenses(tc.lenses)
 			for _, l := range ls {
 				var found bool
@@ -383,32 +385,32 @@ func TestJobPath(t *testing.T) {
 		{
 			name:       "non-presubmit job in GCS with trailing /",
 			src:        "gcs/kubernetes-jenkins/logs/example-job-name/123/",
-			expJobPath: "kubernetes-jenkins/logs/example-job-name",
+			expJobPath: "gs/kubernetes-jenkins/logs/example-job-name",
 		},
 		{
 			name:       "non-presubmit job in GCS without trailing /",
 			src:        "gcs/kubernetes-jenkins/logs/example-job-name/123",
-			expJobPath: "kubernetes-jenkins/logs/example-job-name",
+			expJobPath: "gs/kubernetes-jenkins/logs/example-job-name",
 		},
 		{
 			name:       "presubmit job in GCS with trailing /",
 			src:        "gcs/kubernetes-jenkins/pr-logs/pull/test-infra/0000/example-job-name/314159/",
-			expJobPath: "kubernetes-jenkins/pr-logs/directory/example-job-name",
+			expJobPath: "gs/kubernetes-jenkins/pr-logs/directory/example-job-name",
 		},
 		{
 			name:       "presubmit job in GCS without trailing /",
 			src:        "gcs/kubernetes-jenkins/pr-logs/pull/test-infra/0000/example-job-name/314159",
-			expJobPath: "kubernetes-jenkins/pr-logs/directory/example-job-name",
+			expJobPath: "gs/kubernetes-jenkins/pr-logs/directory/example-job-name",
 		},
 		{
 			name:       "non-presubmit Prow job",
 			src:        "prowjob/example-periodic-job/1111",
-			expJobPath: "chum-bucket/logs/example-periodic-job",
+			expJobPath: "gs/chum-bucket/logs/example-periodic-job",
 		},
 		{
 			name:       "Prow presubmit job",
 			src:        "prowjob/example-presubmit-job/2222",
-			expJobPath: "chum-bucket/pr-logs/directory/example-presubmit-job",
+			expJobPath: "gs/chum-bucket/pr-logs/directory/example-presubmit-job",
 		},
 		{
 			name:     "nonexistent job",
@@ -438,8 +440,9 @@ func TestJobPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		fakeGCSClient := fakeGCSServer.Client()
+		fakeOpener := io.NewGCSOpener(fakeGCSClient)
 		fca := config.Agent{}
-		sg := New(context.Background(), fakeJa, fca.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fca.Config, fakeOpener, false)
 		jobPath, err := sg.JobPath(tc.src)
 		if tc.expError && err == nil {
 			t.Errorf("test %q: JobPath(%q) expected error", tc.name, tc.src)
@@ -552,9 +555,9 @@ func TestProwJobName(t *testing.T) {
 			expJobPath: "",
 		},
 		{
-			name:     "invalid key type",
-			src:      "oh/my/glob/drama/bomb",
-			expError: true,
+			name:       "previously invalid key type is now valid but nonexistent",
+			src:        "oh/my/glob/drama/bomb",
+			expJobPath: "",
 		},
 		{
 			name:     "invalid GCS path",
@@ -564,8 +567,9 @@ func TestProwJobName(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		fakeGCSClient := fakeGCSServer.Client()
+		fakeOpener := io.NewGCSOpener(fakeGCSClient)
 		fca := config.Agent{}
-		sg := New(context.Background(), fakeJa, fca.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fca.Config, fakeOpener, false)
 		jobPath, err := sg.ProwJobName(tc.src)
 		if tc.expError && err == nil {
 			t.Errorf("test %q: JobPath(%q) expected error", tc.name, tc.src)
@@ -670,9 +674,9 @@ func TestRunPath(t *testing.T) {
 			expError: true,
 		},
 		{
-			name:     "invalid key type",
-			src:      "oh/my/glob/drama/bomb",
-			expError: true,
+			name:       "previously invalid key type is now valid",
+			src:        "oh/my/glob/drama/bomb",
+			expRunPath: "my/glob/drama/bomb",
 		},
 		{
 			name:     "nonsense string errors",
@@ -682,6 +686,7 @@ func TestRunPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		fakeGCSClient := fakeGCSServer.Client()
+		fakeOpener := io.NewGCSOpener(fakeGCSClient)
 		fca := config.Agent{}
 		fca.Set(&config.Config{
 			ProwConfig: config.ProwConfig{
@@ -690,7 +695,7 @@ func TestRunPath(t *testing.T) {
 				},
 			},
 		})
-		sg := New(context.Background(), fakeJa, fca.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fca.Config, fakeOpener, false)
 		jobPath, err := sg.RunPath(tc.src)
 		if tc.expError && err == nil {
 			t.Errorf("test %q: RunPath(%q) expected error, got  %q", tc.name, tc.src, jobPath)
@@ -850,7 +855,7 @@ func TestRunToPR(t *testing.T) {
 				},
 			},
 		})
-		sg := New(context.Background(), fakeJa, fca.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fca.Config, io.NewGCSOpener(fakeGCSClient), false)
 		org, repo, num, err := sg.RunToPR(tc.src)
 		if tc.expError && err == nil {
 			t.Errorf("test %q: RunToPR(%q) expected error", tc.name, tc.src)
@@ -937,9 +942,9 @@ func TestProwToGCS(t *testing.T) {
 		}
 		fakeJa = jobs.NewJobAgent(kc, map[string]jobs.PodLogClient{kube.DefaultClusterAlias: fpkc("clusterA"), "trusted": fpkc("clusterB")}, fakeConfigAgent.Config)
 		fakeJa.Start()
-		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, io.NewGCSOpener(fakeGCSClient), false)
 
-		p, err := sg.prowToGCS(tc.key)
+		_, p, err := sg.prowToGCS(tc.key)
 		if err != nil && !tc.expectError {
 			t.Errorf("test %q: unexpected error: %v", tc.key, err)
 			continue
@@ -1072,7 +1077,7 @@ func TestGCSPathRoundTrip(t *testing.T) {
 
 		fakeGCSClient := fakeGCSServer.Client()
 
-		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, io.NewGCSOpener(fakeGCSClient), false)
 		gcspath, _, _ := gcsupload.PathsForJob(
 			&prowapi.GCSConfiguration{Bucket: "test-bucket", PathStrategy: tc.pathStrategy},
 			&downwardapi.JobSpec{
@@ -1184,7 +1189,7 @@ func TestTestGridLink(t *testing.T) {
 				},
 			},
 		})
-		sg := New(context.Background(), fakeJa, fca.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fca.Config, io.NewGCSOpener(fakeGCSClient), false)
 		sg.testgrid = &tg
 		link, err := sg.TestGridLink(tc.src)
 		if tc.expError {
@@ -1231,7 +1236,7 @@ func TestFetchArtifactsPodLog(t *testing.T) {
 
 	fakeGCSClient := fakeGCSServer.Client()
 
-	sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, fakeGCSClient, "", false)
+	sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, io.NewGCSOpener(fakeGCSClient), false)
 	testKeys := []string{
 		"prowjob/job/123",
 		"gcs/kubernetes-jenkins/logs/job/123/",
@@ -1239,7 +1244,7 @@ func TestFetchArtifactsPodLog(t *testing.T) {
 	}
 
 	for _, key := range testKeys {
-		result, err := sg.FetchArtifacts(key, "", 500e6, []string{"build-log.txt"})
+		result, err := sg.FetchArtifacts(context.Background(), key, "", 500e6, []string{"build-log.txt"})
 		if err != nil {
 			t.Errorf("Unexpected error grabbing pod log for %s: %v", key, err)
 			continue
@@ -1343,22 +1348,22 @@ func TestResolveSymlink(t *testing.T) {
 		{
 			name:   "symlink without trailing slash is resolved",
 			path:   "gcs/test-bucket/logs/symlink-party/123",
-			result: "gcs/test-bucket/logs/the-actual-place/123",
+			result: "gs/test-bucket/logs/the-actual-place/123",
 		},
 		{
 			name:   "symlink with trailing slash is resolved",
 			path:   "gcs/test-bucket/logs/symlink-party/123/",
-			result: "gcs/test-bucket/logs/the-actual-place/123",
+			result: "gs/test-bucket/logs/the-actual-place/123",
 		},
 		{
 			name:   "non-symlink without trailing slash is unchanged",
 			path:   "gcs/test-bucket/better-logs/42",
-			result: "gcs/test-bucket/better-logs/42",
+			result: "gs/test-bucket/better-logs/42",
 		},
 		{
 			name:   "non-symlink with trailing slash drops the slash",
 			path:   "gcs/test-bucket/better-logs/42/",
-			result: "gcs/test-bucket/better-logs/42",
+			result: "gs/test-bucket/better-logs/42",
 		},
 		{
 			name:   "prowjob without trailing slash is unchanged",
@@ -1389,7 +1394,7 @@ func TestResolveSymlink(t *testing.T) {
 
 		fakeGCSClient := fakeGCSServer.Client()
 
-		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, fakeGCSClient, "", false)
+		sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, io.NewGCSOpener(fakeGCSClient), false)
 
 		result, err := sg.ResolveSymlink(tc.path)
 		if err != nil {
@@ -1461,7 +1466,6 @@ func TestExtraLinks(t *testing.T) {
 			links:   []ExtraLink{{Name: "A", URL: "http://a", Description: "A!"}, {Name: "B", URL: "http://b"}},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var objects []fakestorage.Object
@@ -1481,9 +1485,9 @@ func TestExtraLinks(t *testing.T) {
 			fakeConfigAgent := fca{}
 			fakeJa = jobs.NewJobAgent(fkc{}, map[string]jobs.PodLogClient{kube.DefaultClusterAlias: fpkc("clusterA")}, fakeConfigAgent.Config)
 			fakeJa.Start()
-			sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, gcsClient, "", false)
+			sg := New(context.Background(), fakeJa, fakeConfigAgent.Config, io.NewGCSOpener(gcsClient), false)
 
-			result, err := sg.ExtraLinks("gcs/test-bucket/logs/some-job/42")
+			result, err := sg.ExtraLinks(context.Background(), "gcs/test-bucket/logs/some-job/42")
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("unexpected error: %v", err)
