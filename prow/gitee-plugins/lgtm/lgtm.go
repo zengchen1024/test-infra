@@ -16,29 +16,11 @@ import (
 	"k8s.io/test-infra/prow/repoowners"
 )
 
-type githubClient interface {
-	IsCollaborator(owner, repo, login string) (bool, error)
-	AddLabel(owner, repo string, number int, label string) error
-	AssignIssue(owner, repo string, number int, assignees []string) error
-	CreateComment(owner, repo string, number int, comment string) error
-	RemoveLabel(owner, repo string, number int, label string) error
-	GetIssueLabels(org, repo string, number int) ([]github.Label, error)
-	GetPullRequest(org, repo string, number int) (*github.PullRequest, error)
-	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
-	ListIssueComments(org, repo string, number int) ([]github.IssueComment, error)
-	DeleteComment(org, repo string, ID int) error
-	BotName() (string, error)
-	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
-	IsMember(org, user string) (bool, error)
-	ListTeams(org string) ([]github.Team, error)
-	ListTeamMembers(id int, role string) ([]github.TeamMember, error)
-}
-
 type getAllConf func() *plugins.Configurations
 
 type lgtm struct {
 	getPluginConfig plugins.GetPluginConfig
-	ghc             githubClient
+	ghc             *ghclient
 	getAllConf      getAllConf
 	oc              repoowners.Interface
 }
@@ -115,7 +97,7 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	comment := e.Comment
 	rc := originl.NewReviewCtx(
-		comment.User.Login, pr.User.Login, comment.Body,
+		comment.User.Login, pr.Head.User.Login, comment.Body,
 		comment.HtmlUrl, repo, assignees, int(pr.Number))
 
 	cp := commentpruner.NewEventClient(
@@ -132,7 +114,7 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
 	}()
 
-	if *(e.State) != "open" {
+	if e.PullRequest.State != "open" {
 		log.Debug("Pull request state is not open, skipping...")
 		return nil
 	}
@@ -149,10 +131,10 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 
 	pr := e.PullRequest
 	var pe github.PullRequestEvent
-	pe.Action = github.PullRequestActionSynchronize
+	pe.Action = plugins.ConvertPullRequestAction(e)
 	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Owner.Login
 	pe.PullRequest.Base.Repo.Name = pr.Base.Repo.Name
-	pe.PullRequest.User.Login = pr.User.Login
+	pe.PullRequest.User.Login = pr.Head.User.Login
 	pe.PullRequest.Number = int(pr.Number)
 	pe.PullRequest.Head.SHA = pr.Head.Sha
 

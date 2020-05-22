@@ -17,8 +17,6 @@ type giteeClient interface {
 	RemovePRLabel(org, repo string, number int, label string) error
 }
 
-var _ githubClient = (*ghclient)(nil)
-
 type ghclient struct {
 	giteeClient
 }

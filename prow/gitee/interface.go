@@ -10,7 +10,7 @@ type Client interface {
 	github.UserClient
 
 	CreatePullRequest(org, repo, title, body, head, base string, canModify bool) (sdk.PullRequest, error)
-	GetPullRequests(org, repo, state, head, base string) ([]sdk.PullRequest, error)
+	GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]sdk.PullRequest, error)
 	UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error)
 
 	ListCollaborators(org, repo string) ([]github.User, error)
@@ -20,6 +20,7 @@ type Client interface {
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
+	UpdatePRComment(org, repo string, commentID int, comment string) error
 	AddPRLabel(org, repo string, number int, label string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
@@ -30,6 +31,19 @@ type Client interface {
 	CreateGiteeIssueComment(org, repo string, number string, comment string) error
 
 	IsCollaborator(owner, repo, login string) (bool, error)
+	IsMember(org, login string) (bool, error)
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
+	GetGiteeRepo(org, repo string) (sdk.Project, error)
+	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
+}
+
+type ListPullRequestOpt struct {
+	State           string
+	Head            string
+	Base            string
+	Sort            string
+	Direction       string
+	MilestoneNumber int
+	Labels          []string
 }

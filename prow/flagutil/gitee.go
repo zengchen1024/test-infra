@@ -80,7 +80,14 @@ func (o *GiteeOptions) GitClient(secretAgent *secret.Agent, dryRun bool) (git.Cl
 		return u.Name, u.Email, nil
 	}
 
-	return git.NewClientFactory("gitee.com", false, c.BotName, f, userInfo, secretAgent.Censor)
+	setOpt := func(opts *git.ClientFactoryOpts) {
+		opts.Host = "gitee.com"
+		opts.Username = c.BotName
+		opts.Token = f
+		opts.GitUser = userInfo
+		opts.Censor = secretAgent.Censor
+	}
+	return git.NewClientFactory(setOpt)
 }
 
 func token(tokenPath string, secretAgent *secret.Agent) (func() []byte, error) {

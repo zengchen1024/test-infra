@@ -86,14 +86,46 @@ func (c *client) CreatePullRequest(org, repo, title, body, head, base string, ca
 	return pr, err
 }
 
-func (c *client) GetPullRequests(org, repo, state, head, base string) ([]sdk.PullRequest, error) {
-	opts := sdk.GetV5ReposOwnerRepoPullsOpts{
-		State: optional.NewString(state),
-		Head:  optional.NewString(head),
-		Base:  optional.NewString(base),
+func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]sdk.PullRequest, error) {
+
+	setStr := func(t *optional.String, v string) {
+		if v != "" {
+			*t = optional.NewString(v)
+		}
 	}
-	prs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPulls(context.Background(), org, repo, &opts)
-	return prs, err
+
+	opt := sdk.GetV5ReposOwnerRepoPullsOpts{}
+	setStr(&opt.State, opts.State)
+	setStr(&opt.Head, opts.Head)
+	setStr(&opt.Base, opts.Base)
+	setStr(&opt.Sort, opts.Sort)
+	setStr(&opt.Direction, opts.Direction)
+	if opts.MilestoneNumber > 0 {
+		opt.MilestoneNumber = optional.NewInt32(int32(opts.MilestoneNumber))
+	}
+	if opts.Labels != nil && len(opts.Labels) > 0 {
+		opt.Labels = optional.NewString(strings.Join(opts.Labels, ","))
+	}
+
+	var r []sdk.PullRequest
+	p := int32(1)
+	for {
+		opt.Page = optional.NewInt32(p)
+		prs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPulls(context.Background(), org, repo, &opt)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(prs) == 0 {
+			break
+		}
+
+		p += 1
+
+		r = append(r, prs...)
+	}
+
+	return r, nil
 }
 
 func (c *client) UpdatePullRequest(org, repo string, number int32, title, body, state, labels string) (sdk.PullRequest, error) {
@@ -231,6 +263,13 @@ func (c *client) CreatePRComment(org, repo string, number int, comment string) e
 	return err
 }
 
+func (c *client) UpdatePRComment(org, repo string, commentID int, comment string) error {
+	opt := sdk.PullRequestCommentPatchParam{Body: comment}
+	_, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsCommentsId(
+		context.Background(), org, repo, int32(commentID), opt)
+	return err
+}
+
 func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
@@ -297,6 +336,18 @@ func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 	return true, nil
 }
 
+func (c *client) IsMember(org, login string) (bool, error) {
+	_, v, err := c.ac.OrganizationsApi.GetV5OrgsOrgMembershipsUsername(
+		context.Background(), org, login, nil)
+	if err != nil {
+		if v.StatusCode == 404 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error) {
 	var r github.SingleCommit
 
@@ -307,4 +358,15 @@ func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, er
 
 	r.Commit.Tree.SHA = v.Commit.Tree.Sha
 	return r, nil
+}
+
+func (c *client) GetGiteeRepo(org, repo string) (sdk.Project, error) {
+	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepo(context.Background(), org, repo, nil)
+	return v, err
+}
+
+func (c *client) MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error {
+	_, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberMerge(
+		context.Background(), owner, repo, int32(number), opt)
+	return err
 }

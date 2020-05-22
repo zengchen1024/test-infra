@@ -24,7 +24,10 @@ func NewConfigAgent() *ConfigAgent {
 func (ca *ConfigAgent) Load(path string, checkUnknownPlugins bool, knownPlugins map[string]HelpProvider) error {
 	pcs := make(map[string]PluginConfig)
 	for n, b := range ca.pcb {
-		pcs[n] = b()
+		v := b()
+		if v != nil {
+			pcs[n] = v
+		}
 	}
 
 	c := &Configurations{pluginConfigs: pcs}

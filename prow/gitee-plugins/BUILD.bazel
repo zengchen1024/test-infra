@@ -9,6 +9,7 @@ go_library(
         "plugin.go",
         "plugins.go",
         "respond.go",
+        "util.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins",
     visibility = ["//visibility:public"],
