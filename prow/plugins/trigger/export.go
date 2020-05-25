@@ -56,10 +56,12 @@ func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, set
 		// When a PR is opened, if the author is in the org then build it.
 		// Otherwise, ask for "/ok-to-test". There's no need to look for previous
 		// "/ok-to-test" comments since the PR was just opened!
-		member, err := TrustedUser(c.GitHubClient, trigger.OnlyOrgMembers, trigger.TrustedOrg, author, org, repo)
+		trustedResponse, err := TrustedUser(c.GitHubClient, trigger.OnlyOrgMembers, trigger.TrustedOrg, author, org, repo)
 		if err != nil {
 			return fmt.Errorf("could not check membership: %s", err)
 		}
+
+		member := trustedResponse.IsTrusted
 		if !member {
 			c.Logger.Infof("Welcome message to PR author %q.", author)
 			if err := welcomeMsg(c.GitHubClient, trigger, pr.PullRequest); err != nil {
@@ -217,10 +219,12 @@ func HandleGenericComment(c Client, trigger plugins.Trigger, gc github.GenericCo
 	}
 
 	// Skip untrusted users comments.
-	trusted, err := TrustedUser(c.GitHubClient, trigger.OnlyOrgMembers, trigger.TrustedOrg, commentAuthor, org, repo)
+	trustedResponse, err := TrustedUser(c.GitHubClient, trigger.OnlyOrgMembers, trigger.TrustedOrg, commentAuthor, org, repo)
 	if err != nil {
 		return fmt.Errorf("error checking trust of %s: %v", commentAuthor, err)
 	}
+
+	trusted := trustedResponse.IsTrusted
 	var l []github.Label
 	if !trusted {
 		// Skip untrusted PRs.
