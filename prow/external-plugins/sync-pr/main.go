@@ -128,5 +128,13 @@ func main() {
 	externalplugins.ServeExternalPluginHelp(mux, log, helpProvider)
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(o.port), Handler: mux}
 	defer interrupts.WaitForGracefulShutdown()
+
+	interrupts.OnInterrupt(func() {
+		serv.GracefulShutdown()
+		if err := gitClient.Clean(); err != nil {
+			logrus.WithError(err).Error("Could not clean up git client cache.")
+		}
+	})
+
 	interrupts.ListenAndServe(httpServer, 5*time.Second)
 }
