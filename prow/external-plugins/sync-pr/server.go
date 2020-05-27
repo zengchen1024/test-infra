@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sync"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -60,6 +61,13 @@ type server struct {
 
 	log   *logrus.Entry
 	robot string
+
+	// Tracks running handlers for graceful shutdown
+	wg sync.WaitGroup
+}
+
+func (s *server) GracefulShutdown() {
+	s.wg.Wait() // Handle remaining requests
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +96,10 @@ func (s *server) handleEvent(eventType, eventGUID string, payload []byte) error 
 		if err := json.Unmarshal(payload, &ic); err != nil {
 			return err
 		}
+		s.wg.Add(1)
 		go func() {
+			defer s.wg.Done()
+
 			if err := s.handleIssueComment(l, ic); err != nil {
 				l.WithError(err).Info("Synchronizing pr failed.")
 			}
