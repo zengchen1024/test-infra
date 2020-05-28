@@ -111,17 +111,11 @@ func (s *server) handleEvent(eventType, eventGUID string, payload []byte) error 
 }
 
 func (s *server) handleIssueComment(l *logrus.Entry, ic github.IssueCommentEvent) error {
-	org := ic.Repo.Owner.Login
-	repo := ic.Repo.Name
-	num := ic.Issue.Number
-
 	l = l.WithFields(logrus.Fields{
-		github.OrgLogField:  org,
-		github.RepoLogField: repo,
-		github.PrLogField:   num,
+		github.OrgLogField:  ic.Repo.Owner.Login,
+		github.RepoLogField: ic.Repo.Name,
+		github.PrLogField:   ic.Issue.Number,
 	})
-
-	l.Info("Requested a pr synchronization.")
 
 	action := github.GenericCommentEventAction("")
 	if ic.Action == github.IssueCommentActionCreated {
@@ -157,6 +151,8 @@ func (s *server) handle(log *logrus.Entry, e *github.GenericCommentEvent) error 
 		return nil
 	}
 
+	log.Info("Requested a pr synchronization.")
+
 	org := e.Repo.Owner.Login
 	repo := e.Repo.Name
 	prNumber := e.Number
@@ -174,7 +170,7 @@ func (s *server) handle(log *logrus.Entry, e *github.GenericCommentEvent) error 
 
 	destOrg := s.config().syncPRFor(org, repo)
 	if destOrg == "" {
-		log.Debugf("can't find dest org for %s/%s", org, repo)
+		log.Warnf("can't find dest org for %s/%s", org, repo)
 		return nil
 	}
 
@@ -203,14 +199,19 @@ func (s *server) handle(log *logrus.Entry, e *github.GenericCommentEvent) error 
 
 	branch := fmt.Sprintf("pull%d", prNumber)
 
-	// sync pr
-	syncDesc, err := s.pushToGitee(destOrg, repo, branch, r.Directory(), spr)
+	// Submit pr
+	dpr, err := s.pushToGitee(destOrg, repo, branch, r.Directory(), spr)
 	if err != nil {
 		return err
 	}
 
-	// create comment
-	return response(s.ghc, syncDesc, e)
+	// Create comment's response
+	desc, err := syncDesc(s.config().GithubCommentTemplate, dpr)
+	if err != nil {
+		return err
+	}
+
+	return response(s.ghc, desc, e)
 }
 
 func canSyncPR(ghc githubClient, e *github.GenericCommentEvent) (bool, error) {
