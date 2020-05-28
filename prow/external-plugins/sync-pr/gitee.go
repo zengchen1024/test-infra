@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"text/template"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 
@@ -11,51 +12,52 @@ import (
 	"k8s.io/test-infra/prow/github"
 )
 
-func (s *server) pushToGitee(destOrg, repo, localBranch, localDir string, spr *github.PullRequest) (string, error) {
+func (s *server) pushToGitee(destOrg, repo, localBranch, localDir string, spr *github.PullRequest) (*sdk.PullRequest, error) {
 	// Push to dest repo
 	r, err := s.gegc.ClientFromDir(s.robot, repo, localDir)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := r.ForcePush(localBranch); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// create or update pr
 	head := fmt.Sprintf("%s:%s", s.robot, localBranch)
-	return s.createOrUpdatePR(spr, destOrg, repo, head)
+
+	// Submit pr
+	return s.submitPR(spr, destOrg, repo, head)
 }
 
-func (s *server) createOrUpdatePR(spr *github.PullRequest, destOrg, repo, head string) (string, error) {
-	syncDesc, err := s.syncDescOnGitee(spr)
+func (s *server) submitPR(spr *github.PullRequest, destOrg, repo, head string) (*sdk.PullRequest, error) {
+	desc, err := syncDesc(s.config().GiteeCommentTemplate, spr)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	body := fmt.Sprintf("%s\n\n%s", spr.Body, syncDesc)
+	body := fmt.Sprintf("%s\n\n%s", spr.Body, desc)
 
 	dpr, err := s.queryPR(destOrg, repo, head)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if dpr == nil {
 		pr, err := s.gec.CreatePullRequest(destOrg, repo, spr.Title, body, head, "master", false)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return s.syncDescOnGithub(&pr)
+		return &pr, nil
 	}
 
 	if strings.Compare(dpr.Body, body) != 0 {
 		_, err = s.gec.UpdatePullRequest(destOrg, repo, dpr.Number, "", body, "", "")
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
-	return s.syncDescOnGithub(dpr)
+	return dpr, nil
 }
 
 func (s *server) queryPR(org, repo, head string) (*sdk.PullRequest, error) {
@@ -80,20 +82,9 @@ func (s *server) queryPR(org, repo, head string) (*sdk.PullRequest, error) {
 	return nil, fmt.Errorf("There are more than one prs in repo(%s/%s) which are open and created by %s", org, repo, opt.Head)
 }
 
-func (s *server) syncDescOnGitee(pr *github.PullRequest) (string, error) {
+func syncDesc(templ *template.Template, data interface{}) (string, error) {
 	var b bytes.Buffer
-	err := s.config().GiteeCommentTemplate.Execute(&b, pr)
-
-	if err != nil {
-		return "", fmt.Errorf("error executing URL template: %v", err)
-	}
-
-	return b.String(), nil
-}
-
-func (s *server) syncDescOnGithub(pr *sdk.PullRequest) (string, error) {
-	var b bytes.Buffer
-	err := s.config().GithubCommentTemplate.Execute(&b, pr)
+	err := templ.Execute(&b, data)
 
 	if err != nil {
 		return "", fmt.Errorf("error executing URL template: %v", err)

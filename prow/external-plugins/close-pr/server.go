@@ -120,6 +120,7 @@ func (s *server) handle(log *logrus.Entry, e *github.PullRequestEvent) error {
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
 	number := pr.Number
+
 	log.Info(fmt.Sprintf("Will close pr: %s/%s:%d", org, repo, number))
 	return s.ghc.ClosePR(org, repo, number)
 }

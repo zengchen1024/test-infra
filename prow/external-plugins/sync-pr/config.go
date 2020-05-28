@@ -25,6 +25,10 @@ type syncPRConfig struct {
 
 // syncPRConfigFor finds the dest org for a repo
 func (s syncPRConfig) syncPRFor(org, repo string) string {
+	if s.DestOrg == nil {
+		return ""
+	}
+
 	if v, ok := s.DestOrg[org]; ok {
 		return v
 	}
