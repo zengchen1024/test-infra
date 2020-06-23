@@ -103,7 +103,7 @@ func (a *approve) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return err
 	}
 
-	org := e.Repository.Owner.Login
+	org := e.Repository.Namespace
 	repo := e.Repository.Name
 
 	c, err := a.approveFor(org, repo)
@@ -162,7 +162,7 @@ func (a *approve) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		return nil
 	}
 
-	return a.handle(e.Repository.Owner.Login, e.Repository.Name, e.PullRequest, log)
+	return a.handle(e.Repository.Namespace, e.Repository.Name, e.PullRequest, log)
 }
 
 func getGiteeOption() prowConfig.GitHubOptions {

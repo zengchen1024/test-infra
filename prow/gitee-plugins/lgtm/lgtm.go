@@ -92,7 +92,7 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	var repo github.Repo
-	repo.Owner.Login = e.Repository.Owner.Login
+	repo.Owner.Login = e.Repository.Namespace
 	repo.Name = e.Repository.Name
 
 	comment := e.Comment
@@ -132,7 +132,7 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 	pr := e.PullRequest
 	var pe github.PullRequestEvent
 	pe.Action = plugins.ConvertPullRequestAction(e)
-	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Owner.Login
+	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Namespace
 	pe.PullRequest.Base.Repo.Name = pr.Base.Repo.Name
 	pe.PullRequest.User.Login = pr.Head.User.Login
 	pe.PullRequest.Number = int(pr.Number)

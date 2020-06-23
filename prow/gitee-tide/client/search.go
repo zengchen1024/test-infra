@@ -135,7 +135,7 @@ func convertToPullRequest(pr sdk.PullRequest) tide.PullRequest {
 	r.BaseRef.Name = githubql.String(pr.Base.Ref)
 	r.Repository.Name = githubql.String(pr.Base.Repo.Name)
 	r.Repository.NameWithOwner = githubql.String(pr.Base.Repo.FullName)
-	r.Repository.Owner.Login = githubql.String(pr.Base.Repo.Owner.Login)
+	r.Repository.Owner.Login = githubql.String(pr.Base.Repo.Namespace.Path)
 
 	if pr.Milestone != nil {
 		r.Milestone = &struct {

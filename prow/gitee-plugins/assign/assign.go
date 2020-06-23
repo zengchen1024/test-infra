@@ -68,7 +68,7 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	ce := github.GenericCommentEvent{
 		Repo: github.Repo{
-			Owner: github.User{Login: e.Repository.Owner.Login},
+			Owner: github.User{Login: e.Repository.Namespace},
 			Name:  e.Repository.Name,
 		},
 		Body:    e.Comment.Body,
