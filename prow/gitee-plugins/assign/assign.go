@@ -27,7 +27,9 @@ func NewAssign(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 }
 
 func (a *assign) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
-	return origina.HelpProvider(nil, nil)
+	ph, _ := origina.HelpProvider(nil, nil)
+	ph.Commands = ph.Commands[:1]
+	return ph, nil
 }
 
 func (a *assign) PluginName() string {

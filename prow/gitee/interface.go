@@ -36,6 +36,8 @@ type Client interface {
 	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
 	GetGiteeRepo(org, repo string) (sdk.Project, error)
 	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
+
+	GetRepos(org string) ([]sdk.Project, error)
 }
 
 type ListPullRequestOpt struct {

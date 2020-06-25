@@ -42,7 +42,9 @@ func (lg *lgtm) HelpProvider(enabledRepos []prowConfig.OrgRepo) (*pluginhelp.Plu
 
 	c1 := originp.Configuration{Lgtm: c.Lgtm}
 
-	return originl.HelpProvider(&c1, enabledRepos)
+	ph, _ := originl.HelpProvider(&c1, enabledRepos)
+	ph.Commands[0].Usage = "/lgtm [cancel]"
+	return ph, nil
 }
 
 func (lg *lgtm) PluginName() string {
