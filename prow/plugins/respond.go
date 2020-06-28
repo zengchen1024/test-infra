@@ -24,16 +24,13 @@ import (
 )
 
 // AboutThisBotWithoutCommands contains the message that explains how to interact with the bot.
-const AboutThisBotWithoutCommands = "Instructions for interacting with me using PR comments are available [here](https://git.k8s.io/community/contributors/guide/pull-requests.md).  If you have questions or suggestions related to my behavior, please file an issue against the [kubernetes/test-infra](https://github.com/kubernetes/test-infra/issues/new?title=Prow%20issue:) repository."
+const AboutThisBotWithoutCommands = "Instructions for interacting with me using PR comments are available [here](https://git.k8s.io/community/contributors/guide/pull-requests.md).  If you have questions or suggestions related to my behavior, please file an issue against the [opensourceways/test-infra](https://github.com/opensourceways/test-infra/issues/new?title=Prow%20issue:) repository."
 
 // AboutThisBotCommands contains the message that links to the commands the bot understand.
 const AboutThisBotCommands = "I understand the commands that are listed [here](https://go.k8s.io/bot-commands)."
 
 // AboutThisBot contains the text of both AboutThisBotWithoutCommands and AboutThisBotCommands.
-const AboutThisBot = AboutThisBotWithoutCommands + " " + AboutThisBotCommands
-
-// ExAboutThisBotWithoutCommands is the alias of AboutThisBotWithoutCommands to be used for other platform, such as gitee
-var ExAboutThisBotWithoutCommands = AboutThisBotWithoutCommands
+var AboutThisBot = GetBotDesc("https://github.com/")
 
 // FormatResponse nicely formats a response to a generic reason.
 func FormatResponse(to, message, reason string) string {
@@ -46,7 +43,7 @@ func FormatResponse(to, message, reason string) string {
 %s
 </details>`
 
-	return fmt.Sprintf(format, to, message, reason, ExAboutThisBotWithoutCommands)
+	return fmt.Sprintf(format, to, message, reason, AboutThisBotWithoutCommands)
 }
 
 // FormatSimpleResponse formats a response that does not warrant additional explanation in the
@@ -59,7 +56,7 @@ func FormatSimpleResponse(to, message string) string {
 %s
 </details>`
 
-	return fmt.Sprintf(format, to, message, ExAboutThisBotWithoutCommands)
+	return fmt.Sprintf(format, to, message, AboutThisBotWithoutCommands)
 }
 
 // FormatICResponse nicely formats a response to an issue comment.

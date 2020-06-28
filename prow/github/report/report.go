@@ -300,7 +300,7 @@ func createComment(reportTemplate *template.Template, pj prowapi.ProwJob, entrie
 		"",
 		"<details>",
 		"",
-		plugins.AboutThisBot,
+		plugins.GetBotDesc(pj.Spec.Refs.CloneURI),
 		"</details>",
 		commentTag,
 	}...)
