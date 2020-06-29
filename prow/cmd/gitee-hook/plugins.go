@@ -49,6 +49,7 @@ func resetPluginHelper(pm plugins.Plugins) {
 		}
 		ph[k] = genHelpProvider(h)
 	}
+	ph["cla"] = claHelpProvider
 	originp.ResetPluginHelp(ph)
 }
 
@@ -78,4 +79,18 @@ func (p pluginHelperClient) GetRepos(org string, _ bool) ([]github.Repo, error) 
 		r = append(r, github.Repo{FullName: item.FullName})
 	}
 	return r, nil
+}
+
+func claHelpProvider(_ *originp.Configuration, enabledRepos []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
+	pluginHelp := &pluginhelp.PluginHelp{
+		Description: "The check-cla plugin rechecks the CLA status of a pull request. If the author of pull request has already signed CLA, the label `openlookeng-cla/yes` will be added, otherwise, the label of `openlookeng-cla/no` will be added.",
+	}
+	pluginHelp.AddCommand(pluginhelp.Command{
+		Usage:       "/check-cla",
+		Description: "Check the CLA status of PR",
+		Featured:    true,
+		WhoCanUse:   "Anyone can use the command.",
+		Examples:    []string{"/check-cla"},
+	})
+	return pluginHelp, nil
 }
