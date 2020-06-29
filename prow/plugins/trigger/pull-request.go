@@ -254,33 +254,42 @@ func welcomeMsg(ghc githubClient, trigger plugins.Trigger, pr github.PullRequest
 		joinOrgURL = fmt.Sprintf("https://github.com/orgs/%s/people", org)
 	}
 
+	var orgMemberURL string
+	if trigger.OrgMemberURL != "" {
+		orgMemberURL = trigger.OrgMemberURL
+	} else {
+		orgMemberURL = fmt.Sprintf("https://github.com/orgs/%s/people", org)
+	}
+
+	commndURL := fmt.Sprintf("%s?repo=%s", plugins.GetBotCommandLink(pr.HTMLURL), encodedRepoFullName)
+
 	var comment string
 	if trigger.IgnoreOkToTest {
 		comment = fmt.Sprintf(`Hi @%s. Thanks for your PR.
 
 PRs from untrusted users cannot be marked as trusted with `+"`/ok-to-test`"+` in this repo meaning untrusted PR authors can never trigger tests themselves. Collaborators can still trigger tests on the PR using `+"`/test all`"+`.
 
-I understand the commands that are listed [here](https://go.k8s.io/bot-commands?repo=%s).
+I understand the commands that are listed [here](%s).
 
 <details>
 
 %s
 </details>
-`, author, encodedRepoFullName, plugins.AboutThisBotWithoutCommands)
+`, author, commndURL, plugins.AboutThisBotWithoutCommands)
 	} else {
 		comment = fmt.Sprintf(`Hi @%s. Thanks for your PR.
 
-I'm waiting for a [%s](https://github.com/orgs/%s/people) %smember to verify that this patch is reasonable to test. If it is, they should reply with `+"`/ok-to-test`"+` on its own line. Until that is done, I will not automatically test new commits in this PR, but the usual testing commands by org members will still work. Regular contributors should [join the org](%s) to skip this step.
+I'm waiting for a [%s](%s) %smember to verify that this patch is reasonable to test. If it is, they should reply with `+"`/ok-to-test`"+` on its own line. Until that is done, I will not automatically test new commits in this PR, but the usual testing commands by org members will still work. Regular contributors should [join the org](%s) to skip this step.
 
 Once the patch is verified, the new status will be reflected by the `+"`%s`"+` label.
 
-I understand the commands that are listed [here](https://go.k8s.io/bot-commands?repo=%s).
+I understand the commands that are listed [here](%s).
 
 <details>
 
 %s
 </details>
-`, author, org, org, more, joinOrgURL, labels.OkToTest, encodedRepoFullName, plugins.AboutThisBotWithoutCommands)
+`, author, org, orgMemberURL, more, joinOrgURL, labels.OkToTest, commndURL, plugins.AboutThisBotWithoutCommands)
 		if err := ghc.AddLabel(org, repo, pr.Number, labels.NeedsOkToTest); err != nil {
 			errors = append(errors, err)
 		}

@@ -1,6 +1,9 @@
 package plugins
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 func ResetPluginHelp(ph map[string]HelpProvider) {
 	pluginHelp = ph
@@ -18,7 +21,6 @@ func GetBotCommandLink(url string) string {
 	return fmt.Sprintf("https://prow.osinfra.cn/%scommand-help", p)
 }
 
-
 func GetBotDesc(url string) string {
 	return fmt.Sprintf(
 		"%s I understand the commands that are listed [here](%s).",
@@ -28,8 +30,8 @@ func GetBotDesc(url string) string {
 }
 
 func parsePlatform(url string) string {
-        re := regexp.MustCompile(".*/(.*).com/")
-        m := re.FindStringSubmatch(s)
+	re := regexp.MustCompile(".*/(.*).com/")
+	m := re.FindStringSubmatch(url)
 	if m != nil {
 		return m[1]
 	}
