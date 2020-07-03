@@ -3838,3 +3838,11 @@ def go_repositories():
         sum = "h1:xK2lYat7ZLaVVcIuj82J8kIro4V6kDe0AUDFboUCwcg=",
         version = "v1.0.0",
     )
+    go_repository(
+        name = "com_github_bndr_gojenkins",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/bndr/gojenkins",
+        sum = "h1:DFIuamRSmXoI/CwB44txuRf8xaHZNejZge/Lui4RYD4=",
+        version = "v1.0.1",
+    )
