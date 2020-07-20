@@ -12,9 +12,10 @@ import (
 	"k8s.io/test-infra/prow/github"
 )
 
-func (s *server) pushToGitee(destOrg, repo, localBranch, localDir string, spr *github.PullRequest) (*sdk.PullRequest, error) {
+func (s *server) pushToGitee(org, repo, localBranch, localDir string, spr *github.PullRequest) (*sdk.PullRequest, error) {
 	// Push to dest repo
-	r, err := s.gegc.ClientFromDir(s.robot, repo, localDir)
+	robotRepo := s.config().middleRepo(org, repo)
+	r, err := s.gegc.ClientFromDir(s.robot, robotRepo, localDir)
 	if err != nil {
 		return nil, err
 	}
@@ -26,6 +27,7 @@ func (s *server) pushToGitee(destOrg, repo, localBranch, localDir string, spr *g
 	head := fmt.Sprintf("%s:%s", s.robot, localBranch)
 
 	// Submit pr
+	destOrg := s.config().syncPRFor(org, repo)
 	return s.submitPR(spr, destOrg, repo, head)
 }
 
