@@ -17,10 +17,12 @@ limitations under the License.
 package jenkins
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -28,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bndr/gojenkins"
 	"github.com/sirupsen/logrus"
 	wait "k8s.io/apimachinery/pkg/util/wait"
 
@@ -205,6 +208,7 @@ type Client struct {
 	dryRun bool
 
 	client     *http.Client
+	jenkins    *gojenkins.Jenkins
 	baseURL    string
 	authConfig *AuthConfig
 
@@ -281,6 +285,9 @@ func NewClient(
 	if tlsConfig != nil {
 		c.client.Transport = &http.Transport{TLSClientConfig: tlsConfig}
 	}
+
+	c.jenkins = gojenkins.CreateJenkins(nil, url, authConfig.Basic.User, string(authConfig.Basic.GetToken()))
+
 	if c.authConfig.CSRFProtect {
 		if err := c.CrumbRequest(); err != nil {
 			return nil, fmt.Errorf("cannot get Jenkins crumb: %v", err)
@@ -577,7 +584,7 @@ func (c *Client) LaunchBuild(spec *prowapi.ProwJobSpec, params url.Values) error
 
 	c.logger.Debugf("getBuildPath/getBuildWithParametersPath: %s", path)
 
-	resp, err := c.request(http.MethodPost, path, params, true)
+	resp, err := c.Post(path, params, true)
 
 	if err != nil {
 		return err
@@ -747,7 +754,7 @@ func (c *Client) Abort(job string, build *Build) error {
 	if c.dryRun {
 		return nil
 	}
-	resp, err := c.request(http.MethodPost, fmt.Sprintf("/job/%s/%d/stop", job, build.Number), nil, false)
+	resp, err := c.Post(fmt.Sprintf("/job/%s/%d/stop", job, build.Number), nil, false)
 	if err != nil {
 		return err
 	}
@@ -756,4 +763,36 @@ func (c *Client) Abort(job string, build *Build) error {
 		return fmt.Errorf("response not 2XX: %s", resp.Status)
 	}
 	return nil
+}
+
+func (c *Client) Post(path string, params url.Values, measure bool) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	backoff := retryDelay
+
+	var body io.Reader
+	if params != nil {
+		body = bytes.NewBufferString(params.Encode())
+	}
+
+	start := time.Now()
+	for retries := 0; retries < maxRetries; retries++ {
+		resp, err = c.jenkins.Requester.Post(path, body, nil, nil)
+
+		if err == nil && resp.StatusCode < 500 {
+			break
+		} else if err == nil && retries+1 < maxRetries {
+			resp.Body.Close()
+		}
+		// Capture the retry in a metric.
+		if measure && c.metrics != nil {
+			c.metrics.RequestRetries.Inc()
+		}
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+	if measure && resp != nil {
+		c.measure(http.MethodPost, path, resp.StatusCode, start)
+	}
+	return resp, err
 }

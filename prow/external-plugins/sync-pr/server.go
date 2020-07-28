@@ -200,7 +200,7 @@ func (s *server) handle(log *logrus.Entry, e *github.GenericCommentEvent) error 
 	branch := fmt.Sprintf("pull%d", prNumber)
 
 	// Submit pr
-	dpr, err := s.pushToGitee(destOrg, repo, branch, r.Directory(), spr)
+	dpr, err := s.pushToGitee(org, repo, branch, r.Directory(), spr)
 	if err != nil {
 		return err
 	}

@@ -61,15 +61,15 @@ func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, set
 			return fmt.Errorf("could not check membership: %s", err)
 		}
 
-		member := trustedResponse.IsTrusted
-		if !member {
-			c.Logger.Infof("Welcome message to PR author %q.", author)
-			if err := welcomeMsg(c.GitHubClient, trigger, pr.PullRequest); err != nil {
-				return fmt.Errorf("could not welcome non-org member %q: %v", author, err)
-			}
+		if trustedResponse.IsTrusted {
+			c.Logger.Info("Starting all jobs for new PR.")
+			return buildAll(c, &pr.PullRequest, pr.GUID, baseSHA, presubmits)
 		}
-		c.Logger.Info("Starting all jobs for new PR.")
-		return buildAll(c, &pr.PullRequest, pr.GUID, baseSHA, presubmits)
+
+		c.Logger.Infof("Welcome message to PR author %q.", author)
+		if err := welcomeMsg(c.GitHubClient, trigger, pr.PullRequest); err != nil {
+			return fmt.Errorf("could not welcome non-org member %q: %v", author, err)
+		}
 	case github.PullRequestActionReopened:
 		// When a PR is reopened, check that the user is in the org or that an org
 		// member had said "/ok-to-test" before building, resulting in label ok-to-test.

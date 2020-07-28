@@ -40,6 +40,7 @@ import (
 	"k8s.io/test-infra/prow/logrusutil"
 	"k8s.io/test-infra/prow/metrics"
 	"k8s.io/test-infra/prow/pjutil"
+	pluginhelp "k8s.io/test-infra/prow/pluginhelp/hook"
 	"k8s.io/test-infra/prow/repoowners"
 )
 
@@ -169,8 +170,12 @@ func main() {
 	// For /hook, handle a webhook normally.
 	http.Handle("/gitee-hook", server)
 	// Serve plugin help information from /plugin-help.
-	// TODO(zengchen1024) pluginhelp use the original plugins.Configuration
-	//http.Handle("/gitee-plugin-help", pluginhelp.NewHelpAgent(pluginAgent, githubClient))
+	// reset the original plugin help to show the plugins developed for gitee
+	resetPluginHelper(pm)
+	http.Handle("/gitee-plugin-help", pluginhelp.NewHelpAgent(
+		pluginHelperAgent{agent: pluginAgent},
+		pluginHelperClient{c: cs.giteeClient},
+	))
 
 	httpServer := &http.Server{Addr: ":" + strconv.Itoa(o.port)}
 

@@ -27,7 +27,9 @@ func NewAssign(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 }
 
 func (a *assign) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
-	return origina.HelpProvider(nil, nil)
+	ph, _ := origina.HelpProvider(nil, nil)
+	ph.Commands = ph.Commands[:1]
+	return ph, nil
 }
 
 func (a *assign) PluginName() string {
@@ -68,7 +70,7 @@ func (a *assign) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	ce := github.GenericCommentEvent{
 		Repo: github.Repo{
-			Owner: github.User{Login: e.Repository.Owner.Login},
+			Owner: github.User{Login: e.Repository.Namespace},
 			Name:  e.Repository.Name,
 		},
 		Body:    e.Comment.Body,

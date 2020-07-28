@@ -370,3 +370,26 @@ func (c *client) MergePR(owner, repo string, number int, opt sdk.PullRequestMerg
 		context.Background(), owner, repo, int32(number), opt)
 	return err
 }
+
+func (c *client) GetRepos(org string) ([]sdk.Project, error) {
+	opt := sdk.GetV5OrgsOrgReposOpts{}
+	var r []sdk.Project
+	p := int32(1)
+	for {
+		opt.Page = optional.NewInt32(p)
+		ps, _, err := c.ac.RepositoriesApi.GetV5OrgsOrgRepos(context.Background(), org, &opt)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(ps) == 0 {
+			break
+		}
+
+		p += 1
+
+		r = append(r, ps...)
+	}
+
+	return r, nil
+}

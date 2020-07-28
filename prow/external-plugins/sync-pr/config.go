@@ -21,6 +21,10 @@ type syncPRConfig struct {
 	// DestOrg is the destination organization to which the pr is synchronized. It is
 	// the map between source org/repo to org.
 	DestOrg map[string]string `json:"dest_org,omitempty"`
+
+	// MiddleRepo is the name of repo which the robot of gitee forked from the dest
+	// gitee repo. It is the map between source(github) org/repo to repo.
+	MiddleRepo map[string]string `json:"middle_repo,omitempty"`
 }
 
 // syncPRConfigFor finds the dest org for a repo
@@ -39,6 +43,20 @@ func (s syncPRConfig) syncPRFor(org, repo string) string {
 	}
 
 	return ""
+}
+
+// middleRepo finds the middle repo
+func (s syncPRConfig) middleRepo(org, repo string) string {
+	if s.MiddleRepo == nil {
+		return repo
+	}
+
+	orgRepo := fmt.Sprintf("%s/%s", org, repo)
+	if v, ok := s.MiddleRepo[orgRepo]; ok {
+		return v
+	}
+
+	return repo
 }
 
 func (s *syncPRConfig) validate() error {

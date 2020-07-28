@@ -73,7 +73,7 @@ func (t *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
 
-	c, err := t.triggerFor(e.Repository.Owner.Login, e.Repository.Name)
+	c, err := t.triggerFor(e.Repository.Namespace, e.Repository.Name)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (t *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	return origint.HandleGenericComment(
 		cl, c, ge,
 		func(m []prowConfig.Presubmit) {
-			SetPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+			SetPresubmit(e.Repository.Namespace, e.Repository.Name, m)
 		},
 	)
 }
@@ -97,7 +97,7 @@ func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handlePullRequest")
 	}()
 
-	c, err := t.triggerFor(e.Repository.Owner.Login, e.Repository.Name)
+	c, err := t.triggerFor(e.Repository.Namespace, e.Repository.Name)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		c,
 		plugins.ConvertPullRequestEvent(e),
 		func(m []prowConfig.Presubmit) {
-			SetPresubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+			SetPresubmit(e.Repository.Namespace, e.Repository.Name, m)
 		},
 	)
 }
@@ -122,7 +122,7 @@ func (t *trigger) handlePushEvent(e *sdk.PushEvent, log *logrus.Entry) error {
 		t.buildOriginClient(log),
 		plugins.ConvertPushEvent(e),
 		func(m []prowConfig.Postsubmit) {
-			setPostsubmit(e.Repository.Owner.Login, e.Repository.Name, m)
+			setPostsubmit(e.Repository.Namespace, e.Repository.Name, m)
 		},
 	)
 }
