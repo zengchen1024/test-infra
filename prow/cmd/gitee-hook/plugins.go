@@ -7,15 +7,21 @@ import (
 	"k8s.io/test-infra/prow/gitee-plugins/approve"
 	"k8s.io/test-infra/prow/gitee-plugins/assign"
 	"k8s.io/test-infra/prow/gitee-plugins/lgtm"
+	"k8s.io/test-infra/prow/gitee-plugins/slack"
 	"k8s.io/test-infra/prow/gitee-plugins/trigger"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
 	originp "k8s.io/test-infra/prow/plugins"
 )
 
-func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.Plugins, cs *clients) {
+func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.Plugins, cs *clients) error {
 	gpc := func(name string) plugins.PluginConfig {
 		return agent.Config().GetPluginConfig(name)
+	}
+
+	botname, err := cs.giteeClient.BotName()
+	if err != nil {
+		return err
 	}
 
 	var v []plugins.Plugin
@@ -23,6 +29,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, assign.NewAssign(gpc, cs.giteeClient))
 	v = append(v, lgtm.NewLGTM(gpc, agent.Config, cs.giteeClient, cs.ownersClient))
 	v = append(v, trigger.NewTrigger(gpc, cfg, cs.giteeClient, cs.prowJobClient, cs.giteeGitClient))
+	v = append(v, slack.NewSlack(gpc, botname))
 
 	for _, i := range v {
 		name := i.PluginName()
@@ -32,6 +39,8 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 
 		agent.RegisterPluginConfigBuilder(name, i.NewPluginConfig)
 	}
+
+	return nil
 }
 
 func genHelpProvider(h plugins.HelpProvider) originp.HelpProvider {
