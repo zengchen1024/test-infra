@@ -85,7 +85,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *server) demuxEvent(eventType, eventGUID string, payload []byte, h http.Header) error {
 	l := logrus.WithFields(
 		logrus.Fields{
-			"event-type":   eventType,
+			"event-type":     eventType,
 			github.EventGUID: eventGUID,
 		},
 	)

@@ -136,7 +136,9 @@ func main() {
 
 	pm := plugins.NewPluginManager()
 
-	initPlugins(configAgent.Config, pluginAgent, pm, cs)
+	if err := initPlugins(configAgent.Config, pluginAgent, pm, cs); err != nil {
+		logrus.WithError(err).Fatal("Error loading plugins.")
+	}
 
 	if err := pluginAgent.Start(o.pluginConfig, true, pm.HelpProviders()); err != nil {
 		logrus.WithError(err).Fatal("Error loading plugins config.")
