@@ -14,6 +14,7 @@ type giteeClient interface {
 	IsCollaborator(owner, repo, login string) (bool, error)
 	AddPRLabel(owner, repo string, number int, label string) error
 	CreatePRComment(owner, repo string, number int, comment string) error
+	UpdatePRComment(org, repo string, commentID int, comment string) error
 	RemovePRLabel(owner, repo string, number int, label string) error
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)

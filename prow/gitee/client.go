@@ -83,7 +83,7 @@ func (c *client) CreatePullRequest(org, repo, title, body, head, base string, ca
 	pr, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPulls(
 		context.Background(), org, repo, opts)
 
-	return pr, err
+	return pr, formatErr(err, "create pull request")
 }
 
 func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]sdk.PullRequest, error) {
@@ -113,7 +113,7 @@ func (c *client) GetPullRequests(org, repo string, opts ListPullRequestOpt) ([]s
 		opt.Page = optional.NewInt32(p)
 		prs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPulls(context.Background(), org, repo, &opt)
 		if err != nil {
-			return nil, err
+			return nil, formatErr(err, "get pull requests")
 		}
 
 		if len(prs) == 0 {
@@ -136,13 +136,13 @@ func (c *client) UpdatePullRequest(org, repo string, number int32, title, body, 
 		Labels: labels,
 	}
 	pr, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsNumber(context.Background(), org, repo, number, opts)
-	return pr, err
+	return pr, formatErr(err, "update pull request")
 }
 
 func (c *client) GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error) {
 	pr, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumber(
 		context.Background(), org, repo, int32(number), nil)
-	return pr, err
+	return pr, formatErr(err, "get pull request")
 }
 
 func (c *client) getUserData() error {
@@ -153,7 +153,7 @@ func (c *client) getUserData() error {
 		if c.userData == nil {
 			u, _, err := c.ac.UsersApi.GetV5User(context.Background(), nil)
 			if err != nil {
-				return fmt.Errorf("fetching bot name from Gitee: %v", err)
+				return formatErr(err, "fetch bot name")
 			}
 			c.userData = &u
 		}
@@ -164,7 +164,7 @@ func (c *client) getUserData() error {
 func (c *client) ListCollaborators(org, repo string) ([]github.User, error) {
 	cs, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaborators(context.Background(), org, repo, nil)
 	if err != nil {
-		return nil, err
+		return nil, formatErr(err, "list collaborators")
 	}
 	var r []github.User
 	for _, i := range cs {
@@ -180,7 +180,7 @@ func (c *client) GetRef(org, repo, ref string) (string, error) {
 	branch := strings.TrimPrefix(ref, "heads/")
 	b, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoBranchesBranch(context.Background(), org, repo, branch, nil)
 	if err != nil {
-		return "", err
+		return "", formatErr(err, "get branch")
 	}
 
 	return b.Commit.Sha, nil
@@ -190,7 +190,7 @@ func (c *client) GetPullRequestChanges(org, repo string, number int) ([]github.P
 	fs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberFiles(
 		context.Background(), org, repo, int32(number), nil)
 	if err != nil {
-		return nil, err
+		return nil, formatErr(err, "list files of pr")
 	}
 
 	var r []github.PullRequestChange
@@ -211,7 +211,7 @@ func (c *client) GetPRLabels(org, repo string, number int) ([]sdk.Label, error) 
 		ls, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberLabels(
 			context.Background(), org, repo, int32(number), &opt)
 		if err != nil {
-			return nil, err
+			return nil, formatErr(err, "list labels of pr")
 		}
 
 		if len(ls) == 0 {
@@ -236,7 +236,7 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 		cs, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberComments(
 			context.Background(), org, repo, int32(number), &opt)
 		if err != nil {
-			return nil, err
+			return nil, formatErr(err, "list comments of pr")
 		}
 
 		if len(cs) == 0 {
@@ -253,34 +253,34 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 func (c *client) DeletePRComment(org, repo string, ID int) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsCommentsId(
 		context.Background(), org, repo, int32(ID), nil)
-	return err
+	return formatErr(err, "delete comment of pr")
 }
 
 func (c *client) CreatePRComment(org, repo string, number int, comment string) error {
 	opt := sdk.PullRequestCommentPostParam{Body: comment}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberComments(
 		context.Background(), org, repo, int32(number), opt)
-	return err
+	return formatErr(err, "create comment of pr")
 }
 
 func (c *client) UpdatePRComment(org, repo string, commentID int, comment string) error {
 	opt := sdk.PullRequestCommentPatchParam{Body: comment}
 	_, _, err := c.ac.PullRequestsApi.PatchV5ReposOwnerRepoPullsCommentsId(
 		context.Background(), org, repo, int32(commentID), opt)
-	return err
+	return formatErr(err, "update comment of pr")
 }
 
 func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 	opt := sdk.PullRequestLabelPostParam{Body: []string{label}}
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberLabels(
 		context.Background(), org, repo, int32(number), opt)
-	return err
+	return formatErr(err, "add label for pr")
 }
 
 func (c *client) RemovePRLabel(org, repo string, number int, label string) error {
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
 		context.Background(), org, repo, int32(number), label, nil)
-	return err
+	return formatErr(err, "remove label of pr")
 }
 
 func (c *client) AssignPR(org, repo string, number int, logins []string) error {
@@ -288,13 +288,13 @@ func (c *client) AssignPR(org, repo string, number int, logins []string) error {
 
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberAssignees(
 		context.Background(), org, repo, int32(number), opt)
-	return err
+	return formatErr(err, "assign reviewer to pr")
 }
 
 func (c *client) UnassignPR(org, repo string, number int, logins []string) error {
 	_, _, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsNumberAssignees(
 		context.Background(), org, repo, int32(number), strings.Join(logins, ","), nil)
-	return err
+	return formatErr(err, "unassign reviewer from pr")
 }
 
 func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
@@ -307,10 +307,10 @@ func (c *client) AssignGiteeIssue(org, repo string, number string, login string)
 
 	if err != nil {
 		if v.StatusCode == 403 {
-			return ErrorForbidden{err: err.Error()}
+			return ErrorForbidden{err: formatErr(err, "assign assignee to issue").Error()}
 		}
 	}
-	return err
+	return formatErr(err, "assign assignee to issue")
 }
 
 func (c *client) UnassignGiteeIssue(org, repo string, number string, login string) error {
@@ -321,7 +321,7 @@ func (c *client) CreateGiteeIssueComment(org, repo string, number string, commen
 	opt := sdk.IssueCommentPostParam{Body: comment}
 	_, _, err := c.ac.IssuesApi.PostV5ReposOwnerRepoIssuesNumberComments(
 		context.Background(), org, repo, number, opt)
-	return err
+	return formatErr(err, "create issue comment")
 }
 
 func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
@@ -331,7 +331,7 @@ func (c *client) IsCollaborator(owner, repo, login string) (bool, error) {
 		if v.StatusCode == 404 {
 			return false, nil
 		}
-		return false, err
+		return false, formatErr(err, "get collaborator of pr")
 	}
 	return true, nil
 }
@@ -343,7 +343,7 @@ func (c *client) IsMember(org, login string) (bool, error) {
 		if v.StatusCode == 404 {
 			return false, nil
 		}
-		return false, err
+		return false, formatErr(err, "get member of org")
 	}
 	return true, nil
 }
@@ -353,7 +353,7 @@ func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, er
 
 	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCommitsSha(context.Background(), org, repo, SHA, nil)
 	if err != nil {
-		return r, err
+		return r, formatErr(err, "get commit info")
 	}
 
 	r.Commit.Tree.SHA = v.Commit.Tree.Sha
@@ -362,13 +362,13 @@ func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, er
 
 func (c *client) GetGiteeRepo(org, repo string) (sdk.Project, error) {
 	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepo(context.Background(), org, repo, nil)
-	return v, err
+	return v, formatErr(err, "get repo")
 }
 
 func (c *client) MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error {
 	_, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberMerge(
 		context.Background(), owner, repo, int32(number), opt)
-	return err
+	return formatErr(err, "merge pr")
 }
 
 func (c *client) GetRepos(org string) ([]sdk.Project, error) {
@@ -379,7 +379,7 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 		opt.Page = optional.NewInt32(p)
 		ps, _, err := c.ac.RepositoriesApi.GetV5OrgsOrgRepos(context.Background(), org, &opt)
 		if err != nil {
-			return nil, err
+			return nil, formatErr(err, "list repos")
 		}
 
 		if len(ps) == 0 {
@@ -392,4 +392,12 @@ func (c *client) GetRepos(org string) ([]sdk.Project, error) {
 	}
 
 	return r, nil
+}
+
+func formatErr(err error, doWhat string) error {
+	if err == nil {
+		return err
+	}
+
+	return fmt.Errorf("Failed to %s: %s", doWhat, err.Error())
 }
