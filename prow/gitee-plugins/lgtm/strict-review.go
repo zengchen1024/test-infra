@@ -29,6 +29,13 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 			headSHA: sha,
 		}
 
+		filenames, err := originl.GetChangedFiles(gc, org, repo, prNumber)
+		if err != nil {
+			return err
+		}
+
+		n.ResetDirs(genDirs(filenames))
+
 	case github.PullRequestActionSynchronize:
 		v, prChanged, err := LoadLGTMnotification(gc, org, repo, prNumber, sha)
 		if err != nil {
@@ -45,13 +52,6 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 	default:
 		return nil
 	}
-
-	filenames, err := originl.GetChangedFiles(gc, org, repo, prNumber)
-	if err != nil {
-		return err
-	}
-
-	n.ResetDirs(genDirs(filenames))
 
 	if err := n.WriteComment(gc, org, repo, prNumber, false); err != nil {
 		return err
@@ -102,6 +102,8 @@ func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.
 		return err
 	}
 
+	s.log.Infof("noti = %#v", noti)
+
 	validReviewers, err := s.fileReviewers()
 	if err != nil {
 		return err
@@ -134,10 +136,8 @@ type strictReview struct {
 func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers map[string]sets.String, e *sdk.NoteEvent, hasLabel bool) error {
 	commenter := e.Comment.User.Login
 
-	ok := canRemoveLgtmLabel(validReviewers, commenter)
-	this.log.Infof("commenter=%s, ok=%v, reviewers=%#v", commenter, ok, validReviewers)
-	if commenter != this.prAuthor && !ok {
-		noti.AddOpponent(commenter)
+	if commenter != this.prAuthor && !isReviewer(validReviewers, commenter) {
+		noti.AddOpponent(commenter, false)
 
 		return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, hasLabel)
 	}
@@ -146,7 +146,12 @@ func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers ma
 		noti.ResetConsentor()
 		noti.ResetOpponents()
 	} else {
-		noti.AddOpponent(commenter)
+		// commenter is not pr author, but is reviewr
+		// I don't know which part of code commenter thought it is not good
+		// Maybe it is directory of which he is reviewer, maybe other parts.
+		// So, it simply sets all the codes need review again. Because the
+		// lgtm label needs no reviewer say `/lgtm cancel`
+		noti.AddOpponent(commenter, true)
 	}
 
 	filenames := make([]string, 0, len(validReviewers))
@@ -161,7 +166,7 @@ func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers ma
 	}
 
 	if hasLabel {
-		return this.gc.RemovePRLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel)
+		return this.removeLabel()
 	}
 	return nil
 }
@@ -172,35 +177,40 @@ func (this *strictReview) handleLGTM(noti *notification, validReviewers map[stri
 
 	if commenter == this.prAuthor {
 		resp := "you cannot LGTM your own PR."
-		this.log.Infof("Commenting with \"%s\".", resp)
 		return this.gc.CreateComment(
 			this.org, this.repo, this.prNumber,
 			plugins.FormatResponseRaw(comment.Body, comment.HtmlUrl, commenter, resp))
 	}
 
-	noti.AddConsentor(commenter)
-
-	isReviewer, canAdd, dirs := canAddLgtmLabel(validReviewers, commenter, noti.GetConsentors())
-	if !isReviewer {
-		return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, hasLabel)
-	}
-
-	if canAdd {
-		noti.ResetDirs([]string{})
-		if err := noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, true); err != nil {
-			return err
-		}
-		// add label
-		if !hasLabel {
-			if err := this.gc.AddLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel); err != nil {
-				return err
-			}
-		}
+	consentors := noti.GetConsentors()
+	if _, ok := consentors[commenter]; ok {
+		// add /lgtm repeatedly
 		return nil
 	}
 
-	noti.ResetDirs(dirs)
-	return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, false)
+	ok := isReviewer(validReviewers, commenter)
+	noti.AddConsentor(commenter, ok)
+
+	if !ok {
+		return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, hasLabel)
+	}
+
+	resetReviewDir(validReviewers, noti)
+
+	ok = canAddLgtmLabel(noti)
+	if err := noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, ok); err != nil {
+		return err
+	}
+
+	if ok && !hasLabel {
+		return this.addLabel()
+	}
+
+	if !ok && hasLabel {
+		return this.removeLabel()
+	}
+
+	return nil
 }
 
 func (this *strictReview) fileReviewers() (map[string]sets.String, error) {
@@ -230,39 +240,27 @@ func (this *strictReview) hasLGTMLabel() (bool, error) {
 	return github.HasLabel(originl.LGTMLabel, labels), nil
 }
 
-func canAddLgtmLabel(validReviewers map[string]sets.String, commenter string, reviewers []string) (bool, bool, []string) {
-	isReviewer := false
-	needReview := map[string]bool{}
-	commenter = github.NormLogin(commenter)
+func (this *strictReview) removeLabel() error {
+	return this.gc.RemoveLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel)
+}
 
-	reviewers1 := make([]string, 0, len(reviewers))
-	for _, v := range reviewers {
-		reviewers1 = append(reviewers1, github.NormLogin(v))
-	}
+func (this *strictReview) addLabel() error {
+	return this.gc.AddLabel(this.org, this.repo, this.prNumber, originl.LGTMLabel)
+}
 
-	for filename, rs := range validReviewers {
-		if rs.Has(commenter) {
-			isReviewer = true
-		} else if !rs.HasAny(reviewers1...) {
-			needReview[filename] = true
+func canAddLgtmLabel(noti *notification) bool {
+	for _, v := range noti.GetOpponents() {
+		if v {
+			// there are reviewers said `/lgtm cancel`
+			return false
 		}
 	}
 
-	if !isReviewer {
-		// not reviewer
-		return false, false, nil
-	}
-
-	if len(needReview) == 0 {
-		// can add label
-		return true, true, nil
-	}
-
-	//return dir to find reviewer
-	return true, false, genDirs(mapKeys(needReview))
+	d := noti.GetDirs()
+	return d == nil || len(d) == 0
 }
 
-func canRemoveLgtmLabel(validReviewers map[string]sets.String, commenter string) bool {
+func isReviewer(validReviewers map[string]sets.String, commenter string) bool {
 	commenter = github.NormLogin(commenter)
 
 	for _, rs := range validReviewers {
@@ -272,4 +270,27 @@ func canRemoveLgtmLabel(validReviewers map[string]sets.String, commenter string)
 	}
 
 	return false
+}
+
+func resetReviewDir(validReviewers map[string]sets.String, noti *notification) {
+	consentors := noti.GetConsentors()
+	reviewers := make([]string, 0, len(consentors))
+	for k, v := range consentors {
+		if v {
+			reviewers = append(reviewers, github.NormLogin(k))
+		}
+	}
+
+	needReview := map[string]bool{}
+	for filename, rs := range validReviewers {
+		if !rs.HasAny(reviewers...) {
+			needReview[filename] = true
+		}
+	}
+
+	if len(needReview) != 0 {
+		noti.ResetDirs(genDirs(mapKeys(needReview)))
+	} else {
+		noti.ResetDirs(nil)
+	}
 }
