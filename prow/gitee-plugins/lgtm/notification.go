@@ -29,8 +29,12 @@ type notification struct {
 	commentID  int
 }
 
-func (this *notification) GetConsentors() []string {
-	return mapKeys(this.consentors)
+func (this *notification) GetConsentors() map[string]bool {
+	return this.consentors
+}
+
+func (this *notification) GetOpponents() map[string]bool {
+	return this.opponents
 }
 
 func (this *notification) ResetConsentor() {
@@ -41,15 +45,15 @@ func (this *notification) ResetOpponents() {
 	this.opponents = map[string]bool{}
 }
 
-func (this *notification) AddConsentor(consentor string) {
-	this.consentors[consentor] = true
+func (this *notification) AddConsentor(consentor string, isReviewer bool) {
+	this.consentors[consentor] = isReviewer
 	if this.opponents[consentor] {
 		delete(this.opponents, consentor)
 	}
 }
 
-func (this *notification) AddOpponent(opponent string) {
-	this.opponents[opponent] = true
+func (this *notification) AddOpponent(opponent string, isReviewer bool) {
+	this.opponents[opponent] = isReviewer
 	if this.consentors[opponent] {
 		delete(this.consentors, opponent)
 	}
@@ -59,21 +63,28 @@ func (this *notification) ResetDirs(s []string) {
 	this.dirs = s
 }
 
+func (this *notification) GetDirs() []string {
+	return this.dirs
+}
+
 func (this *notification) WriteComment(gc *ghclient, org, repo string, prNumber int, ok bool) error {
 	r := consentientDesc
 	if !ok {
 		r = opposedDesc
 	}
+
 	s := strings.Join(this.dirs, dirSepa)
 	if s != "" {
 		s = fmt.Sprintf("%s%s", dirSepa, s)
 	}
+
 	comment := fmt.Sprintf(
 		notificationStr, r,
-		strings.Join(mapKeys(this.consentors), separator),
-		strings.Join(mapKeys(this.opponents), separator),
+		reviewerToComment(this.consentors, separator),
+		reviewerToComment(this.opponents, separator),
 		s,
-		this.headSHA)
+		this.headSHA,
+	)
 
 	if this.commentID == 0 {
 		return gc.CreateComment(org, repo, prNumber, comment)
@@ -111,8 +122,8 @@ func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha stri
 			n.commentID = comment.ID
 
 			if m[5] == sha {
-				n.consentors = sliceToMap(split(m[2], separator))
-				n.opponents = sliceToMap(split(m[3], separator))
+				n.consentors = commentToReviewer(m[2], separator)
+				n.opponents = commentToReviewer(m[3], separator)
 				n.dirs = split(m[4], dirSepa)
 
 				return n, false, nil
@@ -130,6 +141,33 @@ func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha stri
 	n.ResetConsentor()
 	n.ResetOpponents()
 	return n, true, nil
+}
+
+func reviewerToComment(r map[string]bool, sep string) string {
+	s := make([]string, 0, len(r))
+	for k, v := range r {
+		if v {
+			s = append(s, fmt.Sprintf("**%s**", k))
+		} else {
+			s = append(s, k)
+		}
+	}
+	return strings.Join(s, sep)
+}
+
+func commentToReviewer(s, sep string) map[string]bool {
+	if s != "" {
+		a := strings.Split(s, sep)
+		m := make(map[string]bool, len(a))
+
+		for _, item := range a {
+			r := strings.Trim(item, "**")
+			m[r] = (item != r)
+		}
+		return m
+	}
+
+	return map[string]bool{}
 }
 
 func genDirs(filenames []string) []string {
@@ -152,12 +190,4 @@ func mapKeys(m map[string]bool) []string {
 		s = append(s, k)
 	}
 	return s
-}
-
-func sliceToMap(s []string) map[string]bool {
-	m := map[string]bool{}
-	for _, v := range s {
-		m[v] = true
-	}
-	return m
 }
