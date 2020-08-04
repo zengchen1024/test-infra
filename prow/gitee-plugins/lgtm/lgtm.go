@@ -6,6 +6,7 @@ import (
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/test-infra/prow/commentpruner"
 	prowConfig "k8s.io/test-infra/prow/config"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
@@ -35,14 +36,12 @@ func NewLGTM(f plugins.GetPluginConfig, f1 getAllConf, gec giteeClient, oc repoo
 }
 
 func (lg *lgtm) HelpProvider(enabledRepos []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
-	c, err := lg.pluginConfig()
+	c, err := lg.buildOriginConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	c1 := originp.Configuration{Lgtm: c.Lgtm}
-
-	ph, _ := originl.HelpProvider(&c1, enabledRepos)
+	ph, _ := originl.HelpProvider(c, enabledRepos)
 	ph.Commands[0].Usage = "/lgtm [cancel]"
 	return ph, nil
 }
@@ -107,7 +106,14 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		repo.Owner.Login, repo.Name, int(pr.Number),
 	)
 
-	return originl.Handle(toAdd, c, lg.oc, rc, lg.ghc, log, cp)
+	skipCollaborators := originl.SkipCollaborators(c, repo.Owner.Login, repo.Name)
+	pc, _ := lg.pluginConfig()
+
+	if !skipCollaborators || !pc.LgtmFor(repo.Owner.Login, repo.Name).StrictReview {
+		return originl.Handle(toAdd, c, lg.oc, rc, lg.ghc, log, cp)
+	}
+
+	return HandleStrictLGTMComment(lg.ghc, lg.oc, log, toAdd, e)
 }
 
 func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
@@ -121,26 +127,31 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 		return nil
 	}
 
-	if *(e.Action) != "update" {
-		log.Debug("Pull request event is not update , skipping...")
-		return nil
-	}
-
 	c, err := lg.buildOriginConfig()
 	if err != nil {
 		return err
 	}
 
 	pr := e.PullRequest
+	org := pr.Base.Repo.Namespace
+	repo := pr.Base.Repo.Name
+
 	var pe github.PullRequestEvent
 	pe.Action = plugins.ConvertPullRequestAction(e)
-	pe.PullRequest.Base.Repo.Owner.Login = pr.Base.Repo.Namespace
-	pe.PullRequest.Base.Repo.Name = pr.Base.Repo.Name
+	pe.PullRequest.Base.Repo.Owner.Login = org
+	pe.PullRequest.Base.Repo.Name = repo
 	pe.PullRequest.User.Login = pr.Head.User.Login
 	pe.PullRequest.Number = int(pr.Number)
 	pe.PullRequest.Head.SHA = pr.Head.Sha
 
-	return originl.HandlePullRequest(log, lg.ghc, c, &pe)
+	skipCollaborators := originl.SkipCollaborators(c, org, repo)
+	pc, _ := lg.pluginConfig()
+
+	if !skipCollaborators || !pc.LgtmFor(org, repo).StrictReview {
+		return originl.HandlePullRequest(log, lg.ghc, c, &pe)
+	}
+
+	return HandleStrictLGTMPREvent(lg.ghc, &pe)
 }
 
 func (lg *lgtm) pluginConfig() (*configuration, error) {
@@ -162,8 +173,12 @@ func (lg *lgtm) buildOriginConfig() (*originp.Configuration, error) {
 		return nil, err
 	}
 
+	c1 := make([]originp.Lgtm, 0, len(c.Lgtm))
+	for _, i := range c.Lgtm {
+		c1 = append(c1, i.Lgtm)
+	}
 	return &originp.Configuration{
-		Lgtm:   c.Lgtm,
+		Lgtm:   c1,
 		Owners: lg.getAllConf().Owners,
 	}, nil
 }
