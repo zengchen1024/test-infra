@@ -1,8 +1,6 @@
 package lgtm
 
 import (
-	"fmt"
-
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -15,10 +13,13 @@ import (
 
 func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 	pr := e.PullRequest
-	sha := pr.Head.SHA
 	org := pr.Base.Repo.Owner.Login
 	repo := pr.Base.Repo.Name
 	prNumber := pr.Number
+	sha, err := getHashTree(gc, org, repo, pr.Head.SHA)
+	if err != nil {
+		return err
+	}
 
 	var n *notification
 	needRemoveLabel := false
@@ -26,7 +27,7 @@ func HandleStrictLGTMPREvent(gc *ghclient, e *github.PullRequestEvent) error {
 	switch e.Action {
 	case github.PullRequestActionOpened:
 		n = &notification{
-			headSHA: sha,
+			treeHash: sha,
 		}
 
 		filenames, err := originl.GetChangedFiles(gc, org, repo, prNumber)
@@ -73,36 +74,20 @@ func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.
 
 		org:      e.Repository.Namespace,
 		repo:     e.Repository.Name,
-		headSHA:  pr.Head.Sha,
 		prAuthor: pr.Head.User.Login,
 		prNumber: int(pr.Number),
 	}
 
-	/*
-		commenter := e.Comment.User.Login
-		if commenter != s.prAuthor {
-			bingo := false
-			for _, v := range pr.Assignees {
-				if v.Login == commenter {
-					bingo = true
-					break
-				}
-			}
-			if !bingo {
-				err := gc.AssignIssue(s.org, s.repo, s.prNumber, []string{commenter})
-				if err != nil {
-					return err
-				}
-			}
-		}
-	*/
-
-	noti, _, err := LoadLGTMnotification(gc, s.org, s.repo, s.prNumber, s.headSHA)
+	sha, err := getHashTree(gc, s.org, s.repo, pr.Head.Sha)
 	if err != nil {
 		return err
 	}
+	s.treeHash = sha
 
-	s.log.Infof("noti = %#v", noti)
+	noti, _, err := LoadLGTMnotification(gc, s.org, s.repo, s.prNumber, s.treeHash)
+	if err != nil {
+		return err
+	}
 
 	validReviewers, err := s.fileReviewers()
 	if err != nil {
@@ -128,7 +113,7 @@ type strictReview struct {
 
 	org      string
 	repo     string
-	headSHA  string
+	treeHash string
 	prAuthor string
 	prNumber int
 }
@@ -139,7 +124,7 @@ func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers ma
 	if commenter != this.prAuthor && !isReviewer(validReviewers, commenter) {
 		noti.AddOpponent(commenter, false)
 
-		return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, hasLabel)
+		return this.writeComment(noti, hasLabel)
 	}
 
 	if commenter == this.prAuthor {
@@ -160,7 +145,7 @@ func (this *strictReview) handleLGTMCancel(noti *notification, validReviewers ma
 	}
 	noti.ResetDirs(genDirs(filenames))
 
-	err := noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, false)
+	err := this.writeComment(noti, false)
 	if err != nil {
 		return err
 	}
@@ -192,13 +177,13 @@ func (this *strictReview) handleLGTM(noti *notification, validReviewers map[stri
 	noti.AddConsentor(commenter, ok)
 
 	if !ok {
-		return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, hasLabel)
+		return this.writeComment(noti, hasLabel)
 	}
 
 	resetReviewDir(validReviewers, noti)
 
 	ok = canAddLgtmLabel(noti)
-	if err := noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, ok); err != nil {
+	if err := this.writeComment(noti, ok); err != nil {
 		return err
 	}
 
@@ -232,10 +217,14 @@ func (this *strictReview) fileReviewers() (map[string]sets.String, error) {
 	return m, nil
 }
 
+func (this *strictReview) writeComment(noti *notification, ok bool) error {
+	return noti.WriteComment(this.gc, this.org, this.repo, this.prNumber, ok)
+}
+
 func (this *strictReview) hasLGTMLabel() (bool, error) {
 	labels, err := this.gc.GetIssueLabels(this.org, this.repo, this.prNumber)
 	if err != nil {
-		return false, fmt.Errorf("Failed to get pr labels, err:%s", err.Error())
+		return false, err
 	}
 	return github.HasLabel(originl.LGTMLabel, labels), nil
 }
@@ -293,4 +282,13 @@ func resetReviewDir(validReviewers map[string]sets.String, noti *notification) {
 	} else {
 		noti.ResetDirs(nil)
 	}
+}
+
+func getHashTree(gc *ghclient, org, repo, headSHA string) (string, error) {
+	commit, err := gc.GetSingleCommit(org, repo, headSHA)
+	if err != nil {
+		return "", err
+	}
+
+	return commit.Commit.Tree.SHA, nil
 }
