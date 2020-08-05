@@ -25,7 +25,7 @@ type notification struct {
 	consentors map[string]bool
 	opponents  map[string]bool
 	dirs       []string
-	headSHA    string
+	treeHash   string
 	commentID  int
 }
 
@@ -47,14 +47,14 @@ func (this *notification) ResetOpponents() {
 
 func (this *notification) AddConsentor(consentor string, isReviewer bool) {
 	this.consentors[consentor] = isReviewer
-	if this.opponents[consentor] {
+	if _, ok := this.opponents[consentor]; ok {
 		delete(this.opponents, consentor)
 	}
 }
 
 func (this *notification) AddOpponent(opponent string, isReviewer bool) {
 	this.opponents[opponent] = isReviewer
-	if this.consentors[opponent] {
+	if _, ok := this.consentors[opponent]; ok {
 		delete(this.consentors, opponent)
 	}
 }
@@ -73,9 +73,9 @@ func (this *notification) WriteComment(gc *ghclient, org, repo string, prNumber 
 		r = opposedDesc
 	}
 
-	s := strings.Join(this.dirs, dirSepa)
-	if s != "" {
-		s = fmt.Sprintf("%s%s", dirSepa, s)
+	s := ""
+	if this.dirs != nil && len(this.dirs) > 0 {
+		s = fmt.Sprintf("%s%s", dirSepa, strings.Join(this.dirs, dirSepa))
 	}
 
 	comment := fmt.Sprintf(
@@ -83,7 +83,7 @@ func (this *notification) WriteComment(gc *ghclient, org, repo string, prNumber 
 		reviewerToComment(this.consentors, separator),
 		reviewerToComment(this.opponents, separator),
 		s,
-		this.headSHA,
+		this.treeHash,
 	)
 
 	if this.commentID == 0 {
@@ -110,7 +110,7 @@ func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha stri
 		return nil
 	}
 
-	n := &notification{headSHA: sha}
+	n := &notification{treeHash: sha}
 
 	for _, comment := range comments {
 		if comment.User.Login != botname {
@@ -144,6 +144,10 @@ func LoadLGTMnotification(gc *ghclient, org, repo string, prNumber int, sha stri
 }
 
 func reviewerToComment(r map[string]bool, sep string) string {
+	if r == nil || len(r) == 0 {
+		return ""
+	}
+
 	s := make([]string, 0, len(r))
 	for k, v := range r {
 		if v {
