@@ -81,9 +81,6 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	pr := e.PullRequest
-	hasCLAYes := true
-	hasCLANo := true
-
 	org := e.Repository.Namespace
 	repo := e.Repository.Name
 
@@ -95,6 +92,17 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	signed, err := isSigned(org, repo, pr.Head.User.Email, cfg.CheckURL)
 	if err != nil {
 		return err
+	}
+
+	hasCLAYes := false
+	hasCLANo := false
+	for _, label := range pr.Labels {
+		if !hasCLAYes && label.Name == cfg.CLALabelYes {
+			hasCLAYes = true
+		}
+		if !hasCLANo && label.Name == cfg.CLALabelNo {
+			hasCLANo = true
+		}
 	}
 
 	prNumber := int(pr.Number)
