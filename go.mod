@@ -61,6 +61,7 @@ require (
 	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
+	github.com/huaweicloud/golangsdk v0.0.0-20200917123023-f1123a3e25a4
 	github.com/influxdata/influxdb v0.0.0-20161215172503-049f9b42e9a5
 	github.com/jinzhu/gorm v1.9.12
 	github.com/jinzhu/now v1.1.1 // indirect
@@ -85,7 +86,7 @@ require (
 	github.com/tektoncd/pipeline v0.11.0
 	go.opencensus.io v0.22.3 // indirect
 	gocloud.dev v0.19.0
-	golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073
+	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/net v0.0.0-20200301022130-244492dfa37a
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
