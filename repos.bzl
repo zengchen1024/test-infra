@@ -1528,8 +1528,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable",
         importpath = "golang.org/x/crypto",
-        sum = "h1:xMPOj6Pz6UipU1wXLkrtqpHbR0AVFnyPEQq/wRWz9lM=",
-        version = "v0.0.0-20200302210943-78000ba7a073",
+        sum = "h1:vclmkQCjlDX5OydZ9wv8rBCcS0QyQY66Mpf/7BZbInM=",
+        version = "v0.0.0-20200820211705-5c72a883971a",
     )
     go_repository(
         name = "org_golang_x_exp",
@@ -3827,8 +3827,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable",
         importpath = "gitee.com/openeuler/go-gitee",
-        sum = "h1:B/jR7OOPfGrFcn2e4eD3LUG3vJfs+e2GEJWATJQjRd8=",
-        version = "v0.0.0-20200506042249-a91b6e6ed1b1",
+        sum = "h1:Mv0X61ukctaLq2uPsBhUuWiTXVUdoOliMqw+LUq95WY=",
+        version = "v0.0.0-20200918065743-cef3fb7bc147",
     )
     go_repository(
         name = "com_github_antihax_optional",
