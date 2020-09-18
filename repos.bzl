@@ -3846,3 +3846,11 @@ def go_repositories():
         sum = "h1:DFIuamRSmXoI/CwB44txuRf8xaHZNejZge/Lui4RYD4=",
         version = "v1.0.1",
     )
+    go_repository(
+        name = "com_github_huaweicloud_golangsdk",
+        build_file_generation = "on",
+        build_file_proto_mode = "disable",
+        importpath = "github.com/huaweicloud/golangsdk",
+        sum = "h1:SstsgibeL20pNngendLG1QytZuP2rUuByCgViQMCyc0=",
+        version = "v0.0.0-20200917123023-f1123a3e25a4",
+    )
