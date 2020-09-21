@@ -227,14 +227,17 @@ func isSigned(org, repo, email, url string) (bool, error) {
 		return false, fmt.Errorf("response has status %q and body %q", resp.Status, string(rb))
 	}
 
-	var v struct {
+	type signingInfo struct {
 		Signed bool `json:"signed"`
+	}
+	var v struct {
+		Data signingInfo `json:"data"`
 	}
 
 	if err := json.Unmarshal(rb, &v); err != nil {
 		return false, fmt.Errorf("unmarshal failed: %s", err.Error())
 	}
-	return v.Signed, nil
+	return v.Data.Signed, nil
 }
 
 func signGuide(signURL, platform string) string {
