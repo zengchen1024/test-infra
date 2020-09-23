@@ -245,7 +245,7 @@ func signGuide(signURL, platform string) string {
 
 :memo: **Please access [here](%s) to sign the CLA.**
 
-It may take a couple minutes for the CLA signature to be fully registered; after that, please reply here with a new comment: **/check_cla** to verify. Thanks.
+It may take a couple minutes for the CLA signature to be fully registered; after that, please reply here with a new comment: **/check-cla** to verify. Thanks.
 
 ---
 
