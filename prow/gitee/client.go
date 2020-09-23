@@ -278,6 +278,9 @@ func (c *client) AddPRLabel(org, repo string, number int, label string) error {
 }
 
 func (c *client) RemovePRLabel(org, repo string, number int, label string) error {
+	// gitee's bug, it can't deal with the label which includes '/'
+	label = strings.Replace(label, "/", "%2F", -1)
+
 	_, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
 		context.Background(), org, repo, int32(number), label, nil)
 	return formatErr(err, "remove label of pr")
