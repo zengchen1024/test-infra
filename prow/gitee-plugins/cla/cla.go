@@ -177,8 +177,7 @@ func (this *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Ent
 		log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 	}
 
-	signURL := fmt.Sprintf("%s/%s/%s", cfg.SignURL, org, repo)
-	this.ghc.CreateComment(org, repo, prNumber, signGuide(signURL, "gitee"))
+	this.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee"))
 	return nil
 }
 

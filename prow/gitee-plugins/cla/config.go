@@ -59,6 +59,5 @@ type pluginConfig struct {
 	CheckURL string `json:"check_url" required:"true"`
 
 	// SignURL is the url used to sign the cla
-	// The url has the format as https://**/{{org}}/{{repo}}
 	SignURL string `json:"sign_url" required:"true"`
 }
