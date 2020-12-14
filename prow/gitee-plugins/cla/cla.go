@@ -89,7 +89,7 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		return err
 	}
 
-	signed, err := isSigned(org, repo, pr.Head.User.Email, cfg.CheckURL)
+	signed, err := isSigned(pr.Head.User.Email, cfg.CheckURL)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (this *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Ent
 		return err
 	}
 
-	signed, err := isSigned(org, repo, pr.Head.User.Email, cfg.CheckURL)
+	signed, err := isSigned(pr.Head.User.Email, cfg.CheckURL)
 	if err != nil {
 		return err
 	}
@@ -211,8 +211,8 @@ func (this *cla) pluginConfig() (*configuration, error) {
 	return c1, nil
 }
 
-func isSigned(org, repo, email, url string) (bool, error) {
-	endpoint := fmt.Sprintf("%s/%s/%s?email=%s", url, org, repo, email)
+func isSigned(email, url string) (bool, error) {
+	endpoint := fmt.Sprintf("%s?email=%s", url, email)
 
 	resp, err := http.Get(endpoint)
 	if err != nil {

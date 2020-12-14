@@ -23,11 +23,12 @@ func (c *configuration) CLAFor(org, repo string) *pluginConfig {
 	fullName := fmt.Sprintf("%s/%s", org, repo)
 
 	index := -1
-	for i, item := range c.CLA {
-		s := sets.NewString(item.Repos...)
+	for i := range c.CLA {
+		item := &(c.CLA[i])
 
+		s := sets.NewString(item.Repos...)
 		if s.Has(fullName) {
-			return &item
+			return item
 		}
 
 		if s.Has(org) {
@@ -36,7 +37,7 @@ func (c *configuration) CLAFor(org, repo string) *pluginConfig {
 	}
 
 	if index >= 0 {
-		return &c.CLA[index]
+		return &(c.CLA[index])
 	}
 
 	return nil
@@ -55,7 +56,7 @@ type pluginConfig struct {
 	CLALabelNo string `json:"cla_label_no" required:"true"`
 
 	// CheckURL is the url used to check whether the contributor has signed cla
-	// The url has the format as https://**/{{org}}/{{repo}}?email={{email}}
+	// The url has the format as https://**/{{org}}:{{repo}}?email={{email}}
 	CheckURL string `json:"check_url" required:"true"`
 
 	// SignURL is the url used to sign the cla
