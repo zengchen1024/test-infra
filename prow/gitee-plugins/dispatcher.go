@@ -238,14 +238,14 @@ func (d *dispatcher) handlePullRequestEvent(pr *gitee.PullRequestEvent, l *logru
 
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  pr.Repository.Namespace,
-		github.RepoLogField: pr.Repository.Name,
+		github.RepoLogField: pr.Repository.Path,
 		github.PrLogField:   pr.PullRequest.Number,
 		"author":            pr.PullRequest.Head.User.Login,
 		"url":               pr.PullRequest.HtmlUrl,
 	})
 	l.Infof("Pull request %s.", *pr.Action)
 
-	for p, h := range d.pullRequestHandlers(pr.Repository.Namespace, pr.Repository.Name) {
+	for p, h := range d.pullRequestHandlers(pr.Repository.Namespace, pr.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h PullRequestHandler) {
@@ -263,14 +263,14 @@ func (d *dispatcher) handleIssueEvent(i *gitee.IssueEvent, l *logrus.Entry) {
 
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  i.Repository.Namespace,
-		github.RepoLogField: i.Repository.Name,
+		github.RepoLogField: i.Repository.Path,
 		github.PrLogField:   i.Issue.Number,
 		"author":            i.Issue.User.Login,
 		"url":               i.Issue.HtmlUrl,
 	})
 	l.Infof("Issue %s.", *i.Action)
 
-	for p, h := range d.issueHandlers(i.Repository.Namespace, i.Repository.Name) {
+	for p, h := range d.issueHandlers(i.Repository.Namespace, i.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h IssueHandler) {
@@ -288,13 +288,13 @@ func (d *dispatcher) handlePushEvent(pe *gitee.PushEvent, l *logrus.Entry) {
 
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  pe.Repository.Namespace,
-		github.RepoLogField: pe.Repository.Name,
+		github.RepoLogField: pe.Repository.Path,
 		"ref":               pe.Ref,
 		"head":              pe.After,
 	})
 	l.Info("Push event.")
 
-	for p, h := range d.pushEventHandlers(pe.Repository.Owner.Name, pe.Repository.Name) {
+	for p, h := range d.pushEventHandlers(pe.Repository.Owner.Name, pe.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h PushEventHandler) {
@@ -320,7 +320,7 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 
 	l = l.WithFields(logrus.Fields{
 		github.OrgLogField:  e.Repository.Namespace,
-		github.RepoLogField: e.Repository.Name,
+		github.RepoLogField: e.Repository.Path,
 		github.PrLogField:   n,
 		"review":            e.Comment.Id,
 		"commenter":         e.Comment.User.Login,
@@ -328,7 +328,7 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 	})
 	l.Infof("Note %s.", *e.Action)
 
-	for p, h := range d.noteEventHandlers(e.Repository.Namespace, e.Repository.Name) {
+	for p, h := range d.noteEventHandlers(e.Repository.Namespace, e.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h NoteEventHandler) {

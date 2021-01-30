@@ -94,7 +94,7 @@ func (lg *lgtm) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	var repo github.Repo
 	repo.Owner.Login = e.Repository.Namespace
-	repo.Name = e.Repository.Name
+	repo.Name = e.Repository.Path
 
 	comment := e.Comment
 	rc := originl.NewReviewCtx(
@@ -134,7 +134,7 @@ func (lg *lgtm) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entr
 
 	pr := e.PullRequest
 	org := pr.Base.Repo.Namespace
-	repo := pr.Base.Repo.Name
+	repo := pr.Base.Repo.Path
 
 	var pe github.PullRequestEvent
 	pe.Action = plugins.ConvertPullRequestAction(e)

@@ -82,7 +82,7 @@ func (this *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	pr := e.PullRequest
 	org := e.Repository.Namespace
-	repo := e.Repository.Name
+	repo := e.Repository.Path
 
 	cfg, err := this.orgRepoConfig(org, repo)
 	if err != nil {
@@ -155,7 +155,7 @@ func (this *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Ent
 
 	pr := e.PullRequest
 	org := pr.Base.Repo.Namespace
-	repo := pr.Base.Repo.Name
+	repo := pr.Base.Repo.Path
 
 	cfg, err := this.orgRepoConfig(org, repo)
 	if err != nil {

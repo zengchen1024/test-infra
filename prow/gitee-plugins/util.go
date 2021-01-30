@@ -13,7 +13,7 @@ func NoteEventToCommentEvent(e *gitee.NoteEvent) github.GenericCommentEvent {
 			Owner: github.User{
 				Login: e.Repository.Namespace,
 			},
-			Name: e.Repository.Name,
+			Name: e.Repository.Path,
 		},
 		User: github.User{
 			Login: e.Comment.User.Login,
@@ -69,7 +69,7 @@ func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent 
 		PullRequest: github.PullRequest{
 			Base: github.PullRequestBranch{
 				Repo: github.Repo{
-					Name: epr.Base.Repo.Name,
+					Name: epr.Base.Repo.Path,
 					Owner: github.User{
 						Login: epr.Base.Repo.Namespace,
 					},
@@ -111,7 +111,7 @@ func ConvertPushEvent(e *gitee.PushEvent) github.PushEvent {
 			Owner: github.User{
 				Login: e.Repository.Namespace,
 			},
-			Name: e.Repository.Name,
+			Name: e.Repository.Path,
 		},
 		Commits: convertPushCommits(e),
 		Compare: *(e.Compare),

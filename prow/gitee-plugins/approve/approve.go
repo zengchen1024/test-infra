@@ -104,7 +104,7 @@ func (a *approve) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	org := e.Repository.Namespace
-	repo := e.Repository.Name
+	repo := e.Repository.Path
 
 	c, err := a.approveFor(org, repo)
 	if err != nil {
@@ -162,7 +162,7 @@ func (a *approve) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		return nil
 	}
 
-	return a.handle(e.Repository.Namespace, e.Repository.Name, e.PullRequest, log)
+	return a.handle(e.Repository.Namespace, e.Repository.Path, e.PullRequest, log)
 }
 
 func getGiteeOption() prowConfig.GitHubOptions {
