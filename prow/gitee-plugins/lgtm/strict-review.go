@@ -73,7 +73,7 @@ func HandleStrictLGTMComment(gc *ghclient, oc repoowners.Interface, log *logrus.
 		log: log,
 
 		org:      e.Repository.Namespace,
-		repo:     e.Repository.Name,
+		repo:     e.Repository.Path,
 		prAuthor: pr.Head.User.Login,
 		prNumber: int(pr.Number),
 	}
