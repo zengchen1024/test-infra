@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,15 +21,16 @@ import (
 
 type options struct {
 	port              int
-	dryRun            bool
 	gitee             prowflagutil.GiteeOptions
 	hookAgentConfig   string
 	webhookSecretFile string
+	botName           string
+	filePath          string
 }
 
 func (o *options) Validate() error {
 	for _, group := range []flagutil.OptionGroup{&o.gitee} {
-		if err := group.Validate(o.dryRun); err != nil {
+		if err := group.Validate(false); err != nil {
 			return err
 		}
 	}
@@ -37,8 +41,9 @@ func gatherOption() options {
 	o := options{}
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.IntVar(&o.port, "port", 8888, "port to listen on.")
-	fs.StringVar(&o.hookAgentConfig, "hookAgent-config", "/etc/plugins/plugins.yaml", "path to plugin config file.")
-	fs.BoolVar(&o.dryRun, "dry-run", true, "dry run for testing. Uses API tokens but does not mutate.")
+	fs.StringVar(&o.botName, "bot-name", "ci-bot", "the bot name")
+	fs.StringVar(&o.filePath, "file-path", "/root/.gitee_personal_token.json", "The user token file path that the python script needs to use")
+	fs.StringVar(&o.hookAgentConfig, "config", "/etc/plugins/config.yaml", "path to plugin config file.")
 	fs.StringVar(&o.webhookSecretFile, "hmac-secret-file", "/etc/webhook/hmac", "path to the file containing the gitee HMAC secret")
 	for _, group := range []flagutil.OptionGroup{&o.gitee} {
 		group.AddFlags(fs)
@@ -54,31 +59,26 @@ func main() {
 	}
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	//Use global option from the prow config.
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 	log := logrus.StandardLogger().WithField("plugin", "hookAgent")
 
 	//config setting
 	cfg, err := load(o.hookAgentConfig)
 	if err != nil {
-		logrus.WithError(err).Fatal("Error loading hookAgent config.")
+		log.WithError(err).Fatal("Error loading hookAgent config.")
 	}
 	secretAgent := &secret.Agent{}
 	if err := secretAgent.Start([]string{o.gitee.TokenPath, o.webhookSecretFile}); err != nil {
 		log.WithError(err).Fatal("Error starting secrets agent.")
 	}
-
-	giteeClient, err := o.gitee.GiteeClient(secretAgent, o.dryRun)
-	if err != nil {
-		logrus.WithError(err).Fatal("Error getting Gitee client.")
-	}
-	giteeGitClient, err := o.gitee.GitClient(secretAgent, o.dryRun)
-	if err != nil {
-		logrus.WithError(err).Fatal("Error getting Gitee Git client.")
+	generator := secretAgent.GetTokenGenerator(o.gitee.TokenPath)
+	if len(generator()) == 0 {
+		log.WithError(errors.New("token error")).Fatal()
 	}
 
-	name, err := giteeClient.BotName()
+	err = createGiteeTokenFile(o.botName, string(generator()), o.filePath)
 	if err != nil {
-		logrus.WithError(err).Fatal("Error getting Gitee botname.")
+		log.WithError(err).Fatal("create token file fail")
 	}
 	//init server
 	serv := &server{
@@ -86,10 +86,7 @@ func main() {
 		config: func() hookAgentConfig {
 			return cfg
 		},
-		gec:   giteeClient,
-		gegc:  giteeGitClient,
-		log:   log,
-		robot: name,
+		log: log,
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", serv)
@@ -101,4 +98,19 @@ func main() {
 	})
 
 	interrupts.ListenAndServe(httpServer, 5*time.Second)
+}
+
+func createGiteeTokenFile(botName, token, path string) error {
+	cj := struct {
+		User        string `json:"user"`
+		AccessToken string `json:"access_token"`
+	}{
+		botName,
+		token,
+	}
+	con, err := json.Marshal(&cj)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(path, con, 0644)
 }
