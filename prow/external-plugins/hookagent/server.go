@@ -16,7 +16,6 @@ import (
 	"k8s.io/test-infra/prow/pluginhelp"
 )
 
-
 type server struct {
 	tokenGenerator func() []byte
 	config         func() hookAgentConfig
@@ -97,8 +96,8 @@ func (s *server) execScript(fullName, eventType, payload string) {
 				param = append(param, c.PPLType, eventType)
 			}
 			cmd, err := execCmd(c.Process, param...)
-			s.log.Debug(string(cmd))
 			if err != nil {
+				s.log.Info(string(cmd))
 				s.log.Error(err)
 			}
 
