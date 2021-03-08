@@ -7,7 +7,7 @@ description: |
 
 ## 设置本地开发环境
 ```sh
-    git config user.email = example@xx.com
+git config user.email = example@xx.com
 ```
 
 **Note**: 这里的邮箱必须是贡献者注册到Gitee中的邮箱地址，见下图所示
@@ -41,7 +41,7 @@ Date:   Sun Apr 6 10:17:23 2008 -0700
 
 ![gitee_email](gitee_email.png)
 
-3. 比较这2个邮箱是否一致，如果一致，请提issue；否则请选择如下任意一种方式处理
+3. 比较这2个邮箱是否一致，如果一致，请提Issue，这种情况不应该发生；否则请选择如下任意一种方式处理
 
    *方法 1*：
 

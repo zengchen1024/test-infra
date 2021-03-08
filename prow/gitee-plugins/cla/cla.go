@@ -303,6 +303,7 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 
 ---
 
+- Please, firstly see the [FAQ](https://github.com/opensourceways/test-infra/blob/sync-5-22/prow/gitee-plugins/cla/faq.md) to help you handle the problem.
 - If you've already signed a CLA, it's possible you're using a different email address for your %s account. Check your existing CLA data and verify the email. 
 - If you signed the CLA as an employee or a member of an organization, please contact your corporation or organization to verify you have been activated to start contributing.
 - If you have done the above and are still having issues with the CLA being reported as unsigned, please feel free to file an issue.
