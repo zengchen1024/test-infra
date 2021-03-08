@@ -296,6 +296,7 @@ func signGuide(signURL, platform, cInfo string) string {
 	s := `Thanks for your pull request. Before we can look at your pull request, you'll need to sign a Contributor License Agreement (CLA).
 
 %s
+
 :memo: **Please access [here](%s) to sign the CLA.**
 
 It may take a couple minutes for the CLA signature to be fully registered; after that, please reply here with a new comment: **/check-cla** to verify. Thanks.
