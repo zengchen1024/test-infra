@@ -8,7 +8,7 @@ import (
 )
 
 type configuration struct {
-	CLA []pluginConfig `json:"cla,omitempty"`
+	CLA []pluginConfig `json:"cla_euler,omitempty"`
 }
 
 func (c *configuration) Validate() error {
