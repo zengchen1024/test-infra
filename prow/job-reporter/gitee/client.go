@@ -107,13 +107,3 @@ func parsePRNumber(org, repo string, s github.Status) (int, error) {
 	}
 	return 0, fmt.Errorf("Can't parse pr number from url:%s", s.TargetURL)
 }
-
-func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
-	jsc := JobStatusComment{
-		JobsResultNotification:   jobsResultNotification,
-		JobsResultNotificationRe: jobsResultNotificationRe,
-		JobResultNotification:    jobResultNotification,
-		JobResultNotificationRe:  jobResultNotificationRe,
-	}
-	return jsc.ParseCombinedStatus(botname, sha, comments)
-}

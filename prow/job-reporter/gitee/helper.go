@@ -23,6 +23,12 @@ type helper struct {
 	headSHA string
 }
 
+func newJobsComment() *JobsComment {
+	return &JobsComment{
+		JobsResultNotificationRe: jobsResultNotificationRe,
+		JobComment:               jobComment{},
+	}
+}
 func newHelper(c *ghclient, org, repo string, prNumber int) (*helper, error) {
 	pr, err := c.GetGiteePullRequest(org, repo, prNumber)
 	if err != nil {
@@ -34,10 +40,7 @@ func newHelper(c *ghclient, org, repo string, prNumber int) (*helper, error) {
 		return nil, err
 	}
 
-	jsc := &JobsComment{
-		JobsResultNotificationRe: jobsResultNotificationRe,
-		JobComment:               jobComment{},
-	}
+	jsc := newJobsComment()
 
 	labels := make([]string, 0, len(pr.Labels))
 	for i := range pr.Labels {
@@ -56,29 +59,29 @@ func newHelper(c *ghclient, org, repo string, prNumber int) (*helper, error) {
 func (h *helper) genComment(baseSHA, headSHA string, status *github.Status) string {
 	if h.comment == nil {
 		s := ""
-		if h.shaMatched(baseSHA, headSHA) {
+		if h.isSHAMatched(baseSHA, headSHA) {
 			s = h.jsc.UpdateComment("", status)
 		}
 		return h.buildComment(s)
 	}
 
-	m := jobsResultNotificationRe.FindStringSubmatch(h.comment.Body)
+	m := parseCommentElem(h.comment.Body)
 
-	if h.shaMatched(m[2], m[3]) {
-		if h.shaMatched(baseSHA, headSHA) {
-			return h.buildComment(h.jsc.UpdateComment(m[1], status))
+	if h.isSHAMatched(m.baseSHA, m.headSHA) {
+		if h.isSHAMatched(baseSHA, headSHA) {
+			return h.buildComment(h.jsc.UpdateComment(m.jobResult, status))
 		}
 		return ""
 	}
 
 	s := ""
-	if h.shaMatched(baseSHA, headSHA) {
+	if h.isSHAMatched(baseSHA, headSHA) {
 		s = h.jsc.UpdateComment("", status)
 	}
 	return h.buildComment(s)
 }
 
-func (h *helper) shaMatched(baseSHA, headSHA string) bool {
+func (h *helper) isSHAMatched(baseSHA, headSHA string) bool {
 	return h.baseSHA == baseSHA && h.headSHA == headSHA
 }
 
@@ -98,12 +101,12 @@ func (h *helper) genLabel(comment string) string {
 		return ""
 	}
 
-	m := jobsResultNotificationRe.FindStringSubmatch(comment)
+	m := parseCommentElem(comment)
 	if m == nil {
 		return ""
 	}
 
-	ss := h.jsc.ParseComment(m[1])
+	ss := h.jsc.ParseComment(m.jobResult)
 	if len(ss) == 0 {
 		return ""
 	}
@@ -151,4 +154,39 @@ func genLabelByJobStatus(statusSet sets.String) string {
 		return "ci/test-pending"
 	}
 	return "ci/test-success"
+}
+
+type commentElem struct {
+	jobResult string
+	baseSHA   string
+	headSHA   string
+}
+
+func parseCommentElem(s string) *commentElem {
+	m := jobsResultNotificationRe.FindStringSubmatch(s)
+	if m == nil {
+		return nil
+	}
+
+	return &commentElem{
+		jobResult: m[1],
+		baseSHA:   m[2],
+		headSHA:   m[3],
+	}
+}
+
+func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []github.Status {
+	jsc := newJobsComment()
+
+	comment := jsc.FindComment(botname, comments)
+	if comment == nil {
+		return nil
+	}
+
+	m := parseCommentElem(comment.Body)
+	if m.headSHA != sha {
+		return nil
+	}
+
+	return jsc.ParseComment(m.jobResult)
 }
