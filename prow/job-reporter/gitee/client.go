@@ -7,19 +7,10 @@ import (
 	"strconv"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/github/report"
-)
-
-var (
-	jobsResultNotification   = "| Check Name | Result | Details |\n| --- | --- | --- |\n%s\n  <details>Git tree hash: %s</details>"
-	jobsResultNotificationRe = regexp.MustCompile(fmt.Sprintf("\\| Check Name \\| Result \\| Details \\|\n\\| --- \\| --- \\| --- \\|\n%s\n  <details>Git tree hash: %s</details>", "([\\s\\S]*)", "(.*)"))
-	jobResultNotification    = "| %s %s | %s | [details](%s) |"
-	jobResultEachPartRe      = regexp.MustCompile(fmt.Sprintf("\\| %s %s \\| %s \\| \\[details\\]\\(%s\\) \\|", "(.*)", "(.*)", "(.*)", "(.*)"))
-	jobStatusLabelRe         = regexp.MustCompile(`^ci/test-(error|failure|pending|success)$`)
 )
 
 type giteeClient interface {
@@ -37,6 +28,8 @@ var _ report.GitHubClient = (*ghclient)(nil)
 type ghclient struct {
 	giteeClient
 	prNumber int
+	botname  string
+	baseSHA  string
 }
 
 func (c *ghclient) ListIssueComments(org, repo string, number int) ([]github.IssueComment, error) {
@@ -74,84 +67,36 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 	prNumber := c.prNumber
 	var err error
 	if prNumber <= 0 {
-		prNumber, err = parsePRNumber(org, repo, s)
-		if err != nil {
+		if prNumber, err = parsePRNumber(org, repo, s); err != nil {
 			return err
 		}
 	}
 
-	pr, err := c.GetGiteePullRequest(org, repo, prNumber)
+	h, err := newHelper(c, org, repo, prNumber)
 	if err != nil {
 		return err
 	}
-	if ref != pr.Head.Sha {
-		// Secondly check whether the status is for the newest commit, if not, skip.
-		// This check is for the case that two updates for pr happend very closely.
+
+	desc := h.genComment(c.baseSHA, ref, &s)
+	if desc == "" {
 		return nil
 	}
 
-	comments, err := c.ListIssueComments(org, repo, prNumber)
-	if err != nil {
-		return err
-	}
-
-	botname, err := c.BotName()
-	if err != nil {
-		return err
-	}
-
-	jsc := JobStatusComment{
-		JobsResultNotification:   jobsResultNotification,
-		JobsResultNotificationRe: jobsResultNotificationRe,
-		JobResultNotification:    jobResultNotification,
-		JobResultNotificationRe:  jobResultEachPartRe,
-	}
-	// find the old comment even if it is not for the current commit in order to
-	// write the comment at the fixed position.
-	jobsOldComment, oldSha, commentID := jsc.FindCheckResultComment(botname, comments)
-
-	desc := jsc.GenJobResultComment(jobsOldComment, oldSha, ref, s)
-	status := jsc.parseCommentToJobStatus(desc)
-
-	uErr := c.updatePRLabel(org, repo, int32(prNumber), pr.Labels, status)
-	// oldSha == "" means there is not status comment exist.
-	if oldSha == "" {
+	if h.commentID() < 0 {
 		err = c.CreatePRComment(org, repo, prNumber, desc)
-	}else {
-		err = c.UpdatePRComment(org, repo, commentID, desc)
+	} else {
+		err = c.UpdatePRComment(org, repo, h.commentID(), desc)
 	}
+
+	var uErr error
+	if labels, ok := h.updatePRLabel(desc); ok {
+		uErr = c.ReplacePRAllLabels(org, repo, prNumber, labels)
+	}
+
 	if uErr != nil || err != nil {
 		return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
 	}
 	return nil
-}
-
-func (c *ghclient) updatePRLabel(org, repo string, number int32, labels []sdk.Label, status []github.Status) error {
-	labelSet := sets.String{}
-	for _, v := range labels {
-		if !jobStatusLabelRe.MatchString(v.Name) {
-			labelSet.Insert(v.Name)
-		}
-	}
-	statusSet := sets.String{}
-	for _, s := range status {
-		statusSet.Insert(s.State)
-	}
-	labelSet.Insert(genLabelByJobStatus(statusSet))
-	return c.ReplacePRAllLabels(org, repo, int(number), labelSet.List())
-}
-
-func genLabelByJobStatus(statusSet sets.String) string {
-	if statusSet.Has(github.StatusError) {
-		return "ci/test-error"
-	}
-	if statusSet.Has(github.StatusFailure) {
-		return "ci/test-failure"
-	}
-	if statusSet.Has(github.StatusPending) {
-		return "ci/test-pending"
-	}
-	return "ci/test-success"
 }
 
 func parsePRNumber(org, repo string, s github.Status) (int, error) {
@@ -168,7 +113,7 @@ func ParseCombinedStatus(botname, sha string, comments []github.IssueComment) []
 		JobsResultNotification:   jobsResultNotification,
 		JobsResultNotificationRe: jobsResultNotificationRe,
 		JobResultNotification:    jobResultNotification,
-		JobResultNotificationRe:  jobResultEachPartRe,
+		JobResultNotificationRe:  jobResultNotificationRe,
 	}
 	return jsc.ParseCombinedStatus(botname, sha, comments)
 }
