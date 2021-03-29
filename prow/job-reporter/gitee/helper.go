@@ -56,7 +56,35 @@ func newHelper(c *ghclient, org, repo string, prNumber int) (*helper, error) {
 	}, nil
 }
 
-func (h *helper) genComment(baseSHA, headSHA string, status *github.Status) string {
+// The three return values are: new comment, new job label, old job label that needs be deleted
+func (h *helper) genCommentAndLabels(baseSHA, headSHA string, status *github.Status) (string, string, []string) {
+	newComment := h.genNewComment(baseSHA, headSHA, status)
+	if newComment == "" {
+		return "", "", nil
+	}
+
+	currentLabels := sets.String{}
+	for _, v := range h.labels {
+		if jobStatusLabelRe.MatchString(v) {
+			currentLabels.Insert(v)
+		}
+	}
+
+	m := parseCommentElem(newComment)
+	ss := h.jsc.ParseComment(m.jobResult)
+	if len(ss) == 0 {
+		return newComment, "", currentLabels.List()
+	}
+
+	l := genLabelByJobStatus(ss)
+	if currentLabels.Has(l) {
+		currentLabels.Delete(l)
+		return newComment, "", currentLabels.List()
+	}
+	return newComment, l, currentLabels.List()
+}
+
+func (h *helper) genNewComment(baseSHA, headSHA string, status *github.Status) string {
 	if h.comment == nil {
 		s := ""
 		if h.isSHAMatched(baseSHA, headSHA) {
@@ -96,54 +124,12 @@ func (h *helper) buildComment(s string) string {
 	return fmt.Sprintf(jobsResultNotification, s, h.baseSHA, h.headSHA)
 }
 
-func (h *helper) genLabel(comment string) string {
-	if comment == "" {
-		return ""
-	}
-
-	m := parseCommentElem(comment)
-	if m == nil {
-		return ""
-	}
-
-	ss := h.jsc.ParseComment(m.jobResult)
-	if len(ss) == 0 {
-		return ""
-	}
-
+func genLabelByJobStatus(ss []github.Status) string {
 	statusSet := sets.String{}
 	for _, item := range ss {
 		statusSet.Insert(item.State)
 	}
-	return genLabelByJobStatus(statusSet)
-}
 
-func (h *helper) updatePRLabel(comment string) ([]string, bool) {
-	jobLabels := sets.String{}
-	labelSet := sets.String{}
-	for _, v := range h.labels {
-		if jobStatusLabelRe.MatchString(v) {
-			jobLabels.Insert(v)
-		} else {
-			labelSet.Insert(v)
-		}
-	}
-
-	if newLabel := h.genLabel(comment); newLabel != "" {
-		if jobLabels.Has(newLabel) {
-			return nil, false
-		}
-		labelSet.Insert(newLabel)
-		return labelSet.List(), true
-	}
-
-	if len(jobLabels) > 0 {
-		return labelSet.List(), true
-	}
-	return nil, false
-}
-
-func genLabelByJobStatus(statusSet sets.String) string {
 	if statusSet.Has(github.StatusError) {
 		return "ci/test-error"
 	}

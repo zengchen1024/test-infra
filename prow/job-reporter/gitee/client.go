@@ -21,6 +21,8 @@ type giteeClient interface {
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 	ReplacePRAllLabels(owner, repo string, number int, labels []string) error
+	AddPRLabel(org, repo string, number int, label string) error
+	RemovePRLabel(org, repo string, number int, label string) error
 }
 
 var _ report.GitHubClient = (*ghclient)(nil)
@@ -77,24 +79,31 @@ func (c *ghclient) CreateStatus(org, repo, ref string, s github.Status) error {
 		return err
 	}
 
-	desc := h.genComment(c.baseSHA, ref, &s)
-	if desc == "" {
+	newComment, newLabel, invalidLabels := h.genCommentAndLabels(c.baseSHA, ref, &s)
+	if newComment == "" {
 		return nil
 	}
 
 	if h.commentID() < 0 {
-		err = c.CreatePRComment(org, repo, prNumber, desc)
+		err = c.CreatePRComment(org, repo, prNumber, newComment)
 	} else {
-		err = c.UpdatePRComment(org, repo, h.commentID(), desc)
+		err = c.UpdatePRComment(org, repo, h.commentID(), newComment)
 	}
 
-	var uErr error
-	if labels, ok := h.updatePRLabel(desc); ok {
-		uErr = c.ReplacePRAllLabels(org, repo, prNumber, labels)
+	var err1 error
+	if newLabel != "" {
+		err1 = c.AddPRLabel(org, repo, prNumber, newLabel)
 	}
 
-	if uErr != nil || err != nil {
-		return fmt.Errorf("report job status label or comment error, label error: %v; comment error: %v", uErr, err)
+	var err2 error
+	for _, l := range invalidLabels {
+		err2 = c.RemovePRLabel(org, repo, prNumber, l)
+	}
+
+	if err != nil || err1 != nil || err2 != nil {
+		return fmt.Errorf(
+			"Failed to report job status, write comment error: %v, add label error: %v, remove labels error: %v",
+			err, err1, err2)
 	}
 	return nil
 }
