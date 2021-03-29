@@ -5,7 +5,6 @@ go_library(
     srcs = [
       "client.go",
       "reporter.go",
-      "comment.go",
       "helper.go",
       "job-comment.go",
       "jobs-comment.go",
