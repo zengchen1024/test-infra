@@ -287,8 +287,8 @@ func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequest
 		com := commits[v]
 		cs = append(cs, fmt.Sprintf(
 			"The author(**%s**) of commit [%s](%s) need to sign cla.",
-			com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl),
-		)
+			com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl,
+		))
 	}
 	return strings.Join(cs, "\n")
 

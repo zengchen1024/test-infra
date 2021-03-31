@@ -304,16 +304,18 @@ func isSigned(email, url string) (bool, error) {
 
 func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequestCommits) string {
 	if len(unSigns) == 1 {
-		return fmt.Sprintf("The author(**%s**) need to sign cla.",
-			getAuthorOfCommit(commits[unSigns[0]].Commit).Name)
+		return fmt.Sprintf(
+			"The author(**%s**) need to sign cla.",
+			getAuthorOfCommit(commits[unSigns[0]].Commit).Name,
+		)
 	}
 	cs := make([]string, 0, len(unSigns))
 	for _, v := range unSigns {
 		com := commits[v]
 		cs = append(cs, fmt.Sprintf(
 			"The author(**%s**) of commit [%s](%s) need to sign cla.",
-			getAuthorOfCommit(com.Commit).Name, headOfSHA(com.Sha), com.HtmlUrl),
-		)
+			getAuthorOfCommit(com.Commit).Name, headOfSHA(com.Sha), com.HtmlUrl,
+		))
 	}
 	return strings.Join(cs, "\n")
 
