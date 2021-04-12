@@ -119,7 +119,7 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
 		}
-		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.Head.User.Login))
+		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.User.Login))
 	}
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
