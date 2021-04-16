@@ -306,7 +306,7 @@ func (d *dispatcher) handlePushEvent(pe *gitee.PushEvent, l *logrus.Entry) {
 	})
 	l.Info("Push event.")
 
-	for p, h := range d.pushEventHandlers(pe.Repository.Owner.Name, pe.Repository.Path) {
+	for p, h := range d.pushEventHandlers(pe.Repository.Namespace, pe.Repository.Path) {
 		d.wg.Add(1)
 
 		go func(p string, h PushEventHandler) {
@@ -356,6 +356,9 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 func checkRepository(payload []byte, rep *gitee.ProjectHook) error {
 	if rep == nil {
 		return fmt.Errorf("event repository is empty,payload: %s", string(payload))
+	}
+	if rep.Namespace == "" || rep.Path == "" {
+		return fmt.Errorf("event repository namspace or path is empty:%s ", string(payload))
 	}
 	return nil
 }

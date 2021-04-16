@@ -297,9 +297,14 @@ func (c *client) RemovePRLabel(org, repo string, number int, label string) error
 	return formatErr(err, "remove label of pr")
 }
 
+func (c *client) ClosePR(org, repo string, number int) error {
+	opt := sdk.PullRequestUpdateParam{State: StatusClosed}
+	_, err := c.UpdatePullRequest(org, repo, int32(number), opt)
+	return formatErr(err, "close pr")
+}
+
 func (c *client) AssignPR(org, repo string, number int, logins []string) error {
 	opt := sdk.PullRequestAssigneePostParam{Assignees: strings.Join(logins, ",")}
-
 	_, _, err := c.ac.PullRequestsApi.PostV5ReposOwnerRepoPullsNumberAssignees(
 		context.Background(), org, repo, int32(number), opt)
 	return formatErr(err, "assign reviewer to pr")
@@ -318,10 +323,7 @@ func (c *client) GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCo
 }
 
 func (c *client) AssignGiteeIssue(org, repo string, number string, login string) error {
-	opt := sdk.IssueUpdateParam{
-		Repo:     repo,
-		Assignee: login,
-	}
+	opt := sdk.IssueUpdateParam{Repo: repo, Assignee: login}
 	_, v, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(
 		context.Background(), org, number, opt)
 
@@ -438,6 +440,28 @@ func (c *client) ReplacePRAllLabels(owner, repo string, number int, labels []str
 	opt := sdk.PullRequestLabelPostParam{Body: labels}
 	_, _, err := c.ac.PullRequestsApi.PutV5ReposOwnerRepoPullsNumberLabels(context.Background(), owner, repo, int32(number), opt)
 	return formatErr(err, "replace pr labels")
+}
+
+func (c *client) CloseIssue(owner, repo string, number string) error {
+	opt := sdk.IssueUpdateParam{Repo: repo, State: StatusClosed}
+	_, err := c.UpdateIssue(owner, number, opt)
+	return formatErr(err, "close issue")
+}
+
+func (c *client) ReopenIssue(owner, repo string, number string) error {
+	opt := sdk.IssueUpdateParam{Repo: repo, State: StatusOpen}
+	_, err := c.UpdateIssue(owner, number, opt)
+	return formatErr(err, "reopen issue")
+}
+
+func (c *client) UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error) {
+	issue, _, err := c.ac.IssuesApi.PatchV5ReposOwnerIssuesNumber(context.Background(), owner, number, param)
+	return issue, formatErr(err, "update issue")
+}
+
+func (c *client) GetIssueLabels(org, repo, number string) ([]sdk.Label, error) {
+	labels, _, err := c.ac.LabelsApi.GetV5ReposOwnerRepoIssuesNumberLabels(context.Background(), org, repo, number, nil)
+	return labels, formatErr(err, "get issue labels")
 }
 
 func formatErr(err error, doWhat string) error {

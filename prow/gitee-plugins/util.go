@@ -166,3 +166,20 @@ func convertPullRequestLabel(e *gitee.PullRequestEvent) []github.Label {
 	*/
 	return []github.Label{}
 }
+
+func GetOwnerAndRepoByEvent(e interface{}) (string, string) {
+	var repository *gitee.ProjectHook
+	switch t := e.(type) {
+	case *gitee.PullRequestEvent:
+		repository = t.Repository
+	case *gitee.NoteEvent:
+		repository = t.Repository
+	case *gitee.PushEvent:
+		repository = t.Repository
+	case *gitee.IssueEvent:
+		repository = t.Repository
+	default:
+		return "", ""
+	}
+	return repository.Namespace, repository.Path
+}
