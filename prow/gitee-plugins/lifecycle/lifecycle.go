@@ -79,8 +79,9 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
 
-	ne := (*gitee.NoteEvent)(e)
-	if !ne.IsCreateCommentEvent() {
+	ne := gitee.NewNoteEventWrapper(e)
+
+	if !ne.IsCreatingCommentEvent() {
 		log.Debug("Event is not a creation of a comment for PR or issue, skipping.")
 		return nil
 	}
@@ -97,12 +98,13 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 }
 
 func (l *lifecycle) handleIssue(e *sdk.NoteEvent, log *logrus.Entry) error {
-	ne := (*gitee.NoteEvent)(e)
-	if ne.IssueIsClosed() && reopenRe.MatchString(e.Comment.Body) {
+	ne := gitee.NewIssueNoteEvent(e)
+
+	if ne.IsIssueClosed() && reopenRe.MatchString(e.Comment.Body) {
 		return reopenIssue(l.gec, log, e)
 	}
 
-	if ne.IssueIsOpen() && closeRe.MatchString(e.Comment.Body) {
+	if ne.IsIssueOpen() && closeRe.MatchString(e.Comment.Body) {
 		return closeIssue(l.gec, log, e)
 	}
 	return nil

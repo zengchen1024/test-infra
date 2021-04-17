@@ -7,61 +7,65 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/gitee"
-	giteep "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/plugins"
 )
 
-func closeIssue(gc giteeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	org, repo := giteep.GetOwnerAndRepoByEvent(e)
-	ne := (*gitee.NoteEvent)(e)
-	commentAuthor := ne.GetCommenter()
-	number := ne.GetIssueNumber()
+func closeIssue(gc giteeClient, log *logrus.Entry, ne *sdk.NoteEvent) error {
+	e := gitee.NewIssueNoteEvent(ne)
+	org, repo := e.GetOrgRep()
+	commenter := e.GetCommenter()
+	number := e.GetIssueNumber()
 
-	if !isAuthorOrCollaborator(org, repo, ne, gc, log) {
-		response := "You can't close an issue unless you are the author of it or a collaborator."
-		return gc.CreateGiteeIssueComment(
-			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+	if e.GetIssueAuthor() != commenter && !isCollaborator(org, repo, commenter, gc, log) {
+		resp := response(
+			e.NoteEventWrapper,
+			"You can't close an issue unless you are the author of it or a collaborator.",
+		)
+		return gc.CreateGiteeIssueComment(org, repo, number, resp)
 	}
 
 	if err := gc.CloseIssue(org, repo, number); err != nil {
 		return fmt.Errorf("error close issue:%v", err)
 	}
 
-	response := plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Closed this issue.")
-	return gc.CreateGiteeIssueComment(org, repo, number, response)
+	return gc.CreateGiteeIssueComment(
+		org, repo, number, response(e.NoteEventWrapper, "Closed this issue."),
+	)
 }
 
 func closePullRequest(gc giteeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	ne := (*gitee.NoteEvent)(e)
-	if !ne.PRIsOpen() || !closeRe.MatchString(e.Comment.Body) {
+	ne := gitee.NewPRNoteEvent(e)
+	if !ne.IsPROpen() || !closeRe.MatchString(ne.GetComment()) {
 		return nil
 	}
 
-	org, repo := giteep.GetOwnerAndRepoByEvent(e)
-	commentAuthor := ne.GetCommenter()
+	org, repo := ne.GetOrgRep()
+	commenter := ne.GetCommenter()
 	number := ne.GetPRNumber()
 
-	if !isAuthorOrCollaborator(org, repo, ne, gc, log) {
-		response := "You can't close an pullreuqest unless you are the author of it or a collaborator"
-		return gc.CreatePRComment(
-			org, repo, number, plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, response))
+	if ne.GetPRAuthor() != commenter && !isCollaborator(org, repo, commenter, gc, log) {
+		resp := response(
+			ne.NoteEventWrapper,
+			"You can't close a pull reuqest unless you are the author of it or a collaborator.",
+		)
+		return gc.CreatePRComment(org, repo, number, resp)
 	}
+
 	if err := gc.ClosePR(org, repo, number); err != nil {
 		return fmt.Errorf("Error closing PR: %v ", err)
 	}
 
-	response := plugins.FormatResponseRaw(e.Comment.Body, e.Comment.HtmlUrl, commentAuthor, "Closed this PR.")
-	return gc.CreatePRComment(org, repo, number, response)
+	return gc.CreatePRComment(org, repo, number, response(ne.NoteEventWrapper, "Closed this PR."))
 }
 
-func isAuthorOrCollaborator(org, repo string, ne *gitee.NoteEvent, gh giteeClient, log *logrus.Entry) bool {
-	if ne.CommenterIsAuthor() {
-		return true
-	}
-	commenter := ne.GetCommenter()
+func isCollaborator(org, repo, commenter string, gh giteeClient, log *logrus.Entry) bool {
 	isCollaborator, err := gh.IsCollaborator(org, repo, commenter)
 	if err != nil {
 		log.WithError(err).Errorf("Failed IsCollaborator(%s, %s, %s)", org, repo, commenter)
 	}
 	return isCollaborator
+}
+
+func response(e gitee.NoteEventWrapper, desc string) string {
+	return plugins.FormatResponseRaw(e.GetComment(), e.Comment.HtmlUrl, e.GetCommenter(), desc)
 }
