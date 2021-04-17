@@ -100,12 +100,12 @@ func (l *lifecycle) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 func (l *lifecycle) handleIssue(e *sdk.NoteEvent, log *logrus.Entry) error {
 	ne := gitee.NewIssueNoteEvent(e)
 
-	if ne.IsIssueClosed() && reopenRe.MatchString(e.Comment.Body) {
-		return reopenIssue(l.gec, log, e)
+	if ne.IsIssueClosed() && reopenRe.MatchString(ne.GetComment()) {
+		return reopenIssue(l.gec, log, ne)
 	}
 
-	if ne.IsIssueOpen() && closeRe.MatchString(e.Comment.Body) {
-		return closeIssue(l.gec, log, e)
+	if ne.IsIssueOpen() && closeRe.MatchString(ne.GetComment()) {
+		return closeIssue(l.gec, log, ne)
 	}
 	return nil
 }

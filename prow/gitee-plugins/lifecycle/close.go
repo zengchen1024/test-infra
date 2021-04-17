@@ -10,15 +10,14 @@ import (
 	"k8s.io/test-infra/prow/plugins"
 )
 
-func closeIssue(gc giteeClient, log *logrus.Entry, ne *sdk.NoteEvent) error {
-	e := gitee.NewIssueNoteEvent(ne)
-	org, repo := e.GetOrgRep()
-	commenter := e.GetCommenter()
-	number := e.GetIssueNumber()
+func closeIssue(gc giteeClient, log *logrus.Entry, ne gitee.IssueNoteEvent) error {
+	org, repo := ne.GetOrgRep()
+	commenter := ne.GetCommenter()
+	number := ne.GetIssueNumber()
 
-	if e.GetIssueAuthor() != commenter && !isCollaborator(org, repo, commenter, gc, log) {
+	if ne.GetIssueAuthor() != commenter && !isCollaborator(org, repo, commenter, gc, log) {
 		resp := response(
-			e.NoteEventWrapper,
+			ne.NoteEventWrapper,
 			"You can't close an issue unless you are the author of it or a collaborator.",
 		)
 		return gc.CreateGiteeIssueComment(org, repo, number, resp)
@@ -29,7 +28,7 @@ func closeIssue(gc giteeClient, log *logrus.Entry, ne *sdk.NoteEvent) error {
 	}
 
 	return gc.CreateGiteeIssueComment(
-		org, repo, number, response(e.NoteEventWrapper, "Closed this issue."),
+		org, repo, number, response(ne.NoteEventWrapper, "Closed this issue."),
 	)
 }
 

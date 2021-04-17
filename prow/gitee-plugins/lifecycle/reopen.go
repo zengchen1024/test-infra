@@ -1,14 +1,12 @@
 package lifecycle
 
 import (
-	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/test-infra/prow/gitee"
 )
 
-func reopenIssue(gc giteeClient, log *logrus.Entry, e *sdk.NoteEvent) error {
-	ne := gitee.NewIssueNoteEvent(e)
+func reopenIssue(gc giteeClient, log *logrus.Entry, ne gitee.IssueNoteEvent) error {
 	org, repo := ne.GetOrgRep()
 	commenter := ne.GetCommenter()
 	number := ne.GetIssueNumber()

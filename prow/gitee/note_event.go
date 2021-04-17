@@ -47,12 +47,12 @@ type IssueNoteEvent struct {
 	NoteEventWrapper
 }
 
-//IsIssueClosed whether the status is close  of the issue
+//IsIssueClosed whether the status of issue is close
 func (ne IssueNoteEvent) IsIssueClosed() bool {
 	return ne.Issue.State == StatusClosed
 }
 
-//IsIssueOpen whether the status is open  of the issue
+//IsIssueOpen whether the status of issue is open
 func (ne IssueNoteEvent) IsIssueOpen() bool {
 	return ne.Issue.State == StatusOpen
 }
@@ -81,7 +81,7 @@ func (ne PRNoteEvent) GetPRAuthor() string {
 	return ne.PullRequest.User.Login
 }
 
-//IsPROpen whether the status is open  of the pull request
+//IsPROpen whether the status of PR is open
 func (ne PRNoteEvent) IsPROpen() bool {
 	return ne.PullRequest.State == StatusOpen
 }
