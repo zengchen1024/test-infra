@@ -62,7 +62,7 @@ can_review    ------------->   lgtm    ------------->   ci-test-success    -----
    如果没有配置相应的测试用例，则只要满足标签的条件，lgtm和approve标签就可以打上。
    
    凡是修改了代码，则ci-test-success，approve，lgtm和can_review标签都要删除；同时更新每个模块的review情况
-   重新跑B类测试用例时，ci-test-*相关的标签，此时删除approve标签意义不大，因为没有要求重新review，只能是先删再加标签，可能还给approver造成误解，以为需要review。
+   重新跑B类测试用例时，删除ci-test-*相关的标签，此时删除approve标签意义不大，因为没有要求重新review，只能是先删再加标签，可能还给approver造成误解，以为需要review。
 
    pr修改清空以前所有的review记录不合适，因为pr作者可能只修改了其中某个模块的代码，清空以前的所有记录就需要重新review；
    理想的情况是只对修改涉及到的模块重新review，不涉及的就不用重新review。那么有没有方式知道用户这次提交了哪些commit呢？   
@@ -138,7 +138,7 @@ reviewers:
    /b/OWNERS  
 ```
    
-   - 现在lisi 加了/lgtm 的评论，机器人回复如下格式的评论
+   - lisi 评论了/approve ，机器人回复如下格式的评论
 ```markdown
    /lgtm: cuihua
    /approve: lisi
@@ -151,7 +151,7 @@ reviewers:
    /b/OWNERS 
 ```  
 
-   - 现在wangwu 加了/lgtm 的评论， 机器人回复如下格式的评论
+   - wangwu 评论了/lgtm ， 机器人回复如下格式的评论
 ```markdown
    /lgtm: cuihua, wangwu
    /approve: lisi
