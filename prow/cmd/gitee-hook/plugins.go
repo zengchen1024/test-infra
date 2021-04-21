@@ -10,6 +10,7 @@ import (
 	"k8s.io/test-infra/prow/gitee-plugins/checkpr"
 	"k8s.io/test-infra/prow/gitee-plugins/cla"
 	claeuler "k8s.io/test-infra/prow/gitee-plugins/cla-euler"
+	"k8s.io/test-infra/prow/gitee-plugins/clone-repo"
 	"k8s.io/test-infra/prow/gitee-plugins/label"
 	"k8s.io/test-infra/prow/gitee-plugins/lgtm"
 	"k8s.io/test-infra/prow/gitee-plugins/lifecycle"
@@ -42,6 +43,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, checkpr.NewCheckPr(gpc, cs.giteeClient))
 	v = append(v, lifecycle.NewLifeCycle(gpc, cs.giteeClient))
 	v = append(v, label.NewLabel(gpc, cs.giteeClient))
+	v = append(v, clonerepo.NewPlugin(cs.giteeGitClient))
 
 	for _, i := range v {
 		name := i.PluginName()
