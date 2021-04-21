@@ -11,7 +11,9 @@ import (
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
+
 	prowConfig "k8s.io/test-infra/prow/config"
+	"k8s.io/test-infra/prow/gitee"
 	plugins "k8s.io/test-infra/prow/gitee-plugins"
 	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/pluginhelp"
@@ -26,6 +28,7 @@ type cla struct {
 	ghc             *ghclient
 }
 
+//NewCLA create a cla plugin
 func NewCLA(f plugins.GetPluginConfig, gec giteeClient) plugins.Plugin {
 	return &cla{
 		getPluginConfig: f,
@@ -66,31 +69,32 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	defer func() {
 		log.WithField("duration", time.Since(funcStart).String()).Debug("Completed handleNoteEvent")
 	}()
-
-	if *(e.Action) != "comment" {
+	ne := gitee.NewPRNoteEvent(e)
+	if !ne.IsCreatingCommentEvent() {
 		log.Debug("Event is not a creation of a comment, skipping.")
 		return nil
 	}
 
-	if *(e.NoteableType) != "PullRequest" {
+	if !ne.IsPullRequest() {
 		return nil
 	}
 
 	// Only consider "/check-cla" comments.
-	if !checkCLARe.MatchString(e.Comment.Body) {
+	if !checkCLARe.MatchString(ne.GetComment()) {
 		return nil
 	}
 
-	pr := e.PullRequest
-	org := e.Repository.Namespace
-	repo := e.Repository.Path
+	return cl.handlePullRequestComment(ne, log)
+}
 
+func (cl *cla) handlePullRequestComment(e gitee.PRNoteEvent, log *logrus.Entry) error {
+	org, repo := e.GetOrgRep()
 	cfg, err := cl.orgRepoConfig(org, repo)
 	if err != nil {
 		return err
 	}
 
-	prNumber := int(pr.Number)
+	prNumber := e.GetPRNumber()
 	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
 	if err != nil {
 		return err
@@ -98,6 +102,7 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 	hasCLAYes := false
 	hasCLANo := false
+	pr := e.PullRequest
 	for _, label := range pr.Labels {
 		if !hasCLAYes && label.Name == cfg.CLALabelYes {
 			hasCLAYes = true
@@ -133,7 +138,6 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 		}
 	}
 	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
-
 }
 
 func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
@@ -148,19 +152,17 @@ func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry
 	}
 
 	action := plugins.ConvertPullRequestAction(e)
-	if action != github.PullRequestActionOpened {
+	if action != github.PullRequestActionOpened && action != github.PullRequestActionSynchronize {
 		return nil
 	}
 
-	pr := e.PullRequest
-	org := pr.Base.Repo.Namespace
-	repo := pr.Base.Repo.Path
-
+	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 	cfg, err := cl.orgRepoConfig(org, repo)
 	if err != nil {
 		return err
 	}
 
+	pr := e.PullRequest
 	prNumber := int(pr.Number)
 	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
 	if err != nil {

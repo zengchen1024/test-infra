@@ -15,6 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//prow/config:go_default_library",
+        "//prow/gitee:go_default_library",
         "//prow/gitee-hook:go_default_library",
         "//prow/github:go_default_library",
         "//prow/labels:go_default_library",

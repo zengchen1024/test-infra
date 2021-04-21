@@ -4,21 +4,12 @@ import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 )
 
-func GetOwnerAndRepoByEvent(e interface{}) (string, string) {
-	var repository *sdk.ProjectHook
+//GetOwnerAndRepoByPREvent obtain the owner and repository name from the pullrequest's event
+func GetOwnerAndRepoByPREvent(pre *sdk.PullRequestEvent) (string, string) {
+	return pre.Repository.Namespace, pre.Repository.Path
+}
 
-	switch t := e.(type) {
-	case *sdk.PullRequestEvent:
-		repository = t.Repository
-	case *sdk.NoteEvent:
-		repository = t.Repository
-	case *sdk.IssueEvent:
-		repository = t.Repository
-	case *sdk.PushEvent:
-		repository = t.Repository
-	default:
-		return "", ""
-	}
-
-	return repository.Namespace, repository.Path
+//GetOwnerAndRepoByIssueEvent obtain the owner and repository name from the issue's event
+func GetOwnerAndRepoByIssueEvent(issue *sdk.IssueEvent) (string, string) {
+	return issue.Repository.Namespace, issue.Repository.Path
 }

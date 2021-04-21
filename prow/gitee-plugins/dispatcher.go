@@ -12,6 +12,7 @@ import (
 
 	"gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
+
 	hook "k8s.io/test-infra/prow/gitee-hook"
 	"k8s.io/test-infra/prow/github"
 )
@@ -113,7 +114,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &e); err != nil {
 			return err
 		}
-		if err := checkRepository(payload, e.Repository); err != nil {
+		if err := checkNoteEvent(&e); err != nil {
 			return err
 		}
 		srcRepo = e.Repository.FullName
@@ -125,7 +126,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &ie); err != nil {
 			return err
 		}
-		if err := checkRepository(payload, ie.Repository); err != nil {
+		if err := checkIssueEvent(&ie); err != nil {
 			return err
 		}
 		srcRepo = ie.Repository.FullName
@@ -137,7 +138,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &pr); err != nil {
 			return err
 		}
-		if err := checkRepository(payload, pr.Repository); err != nil {
+		if err := checkPullRequestEvent(&pr); err != nil {
 			return err
 		}
 		srcRepo = pr.Repository.FullName
@@ -149,7 +150,7 @@ func (d *dispatcher) Dispatch(eventType, eventGUID string, payload []byte, h htt
 		if err := json.Unmarshal(payload, &pe); err != nil {
 			return err
 		}
-		if err := checkRepository(payload, pe.Repository); err != nil {
+		if err := checkRepository(pe.Repository, "push event"); err != nil {
 			return err
 		}
 		srcRepo = pe.Repository.FullName
@@ -252,7 +253,7 @@ func (d *dispatcher) handlePullRequestEvent(pr *gitee.PullRequestEvent, l *logru
 		github.OrgLogField:  pr.Repository.Namespace,
 		github.RepoLogField: pr.Repository.Path,
 		github.PrLogField:   pr.PullRequest.Number,
-		"author":            pr.PullRequest.Head.User.Login,
+		"author":            pr.PullRequest.User.Login,
 		"url":               pr.PullRequest.HtmlUrl,
 	})
 	l.Infof("Pull request %s.", *pr.Action)
@@ -351,14 +352,4 @@ func (d *dispatcher) handleNoteEvent(e *gitee.NoteEvent, l *logrus.Entry) {
 			}
 		}(p, h)
 	}
-}
-
-func checkRepository(payload []byte, rep *gitee.ProjectHook) error {
-	if rep == nil {
-		return fmt.Errorf("event repository is empty,payload: %s", string(payload))
-	}
-	if rep.Namespace == "" || rep.Path == "" {
-		return fmt.Errorf("event repository namspace or path is empty:%s ", string(payload))
-	}
-	return nil
 }

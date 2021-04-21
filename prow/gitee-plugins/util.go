@@ -1,13 +1,16 @@
 package plugins
 
 import (
+	"fmt"
 	"strings"
 
-	"gitee.com/openeuler/go-gitee/gitee"
+	sdk "gitee.com/openeuler/go-gitee/gitee"
+
+	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 )
 
-func NoteEventToCommentEvent(e *gitee.NoteEvent) github.GenericCommentEvent {
+func NoteEventToCommentEvent(e *sdk.NoteEvent) github.GenericCommentEvent {
 	gc := github.GenericCommentEvent{
 		Repo: github.Repo{
 			Owner: github.User{
@@ -32,7 +35,7 @@ func NoteEventToCommentEvent(e *gitee.NoteEvent) github.GenericCommentEvent {
 	return gc
 }
 
-func convertNoteEventAction(e *gitee.NoteEvent) github.GenericCommentEventAction {
+func convertNoteEventAction(e *sdk.NoteEvent) github.GenericCommentEventAction {
 	var a github.GenericCommentEventAction
 
 	switch *(e.Action) {
@@ -42,7 +45,7 @@ func convertNoteEventAction(e *gitee.NoteEvent) github.GenericCommentEventAction
 	return a
 }
 
-func convertAssignees(assignees []gitee.UserHook) []github.User {
+func convertAssignees(assignees []sdk.UserHook) []github.User {
 	r := make([]github.User, len(assignees))
 	for i, item := range assignees {
 		r[i] = github.User{Login: item.Login}
@@ -50,18 +53,18 @@ func convertAssignees(assignees []gitee.UserHook) []github.User {
 	return r
 }
 
-func setPullRequestInfo(e *gitee.NoteEvent, gc *github.GenericCommentEvent) {
+func setPullRequestInfo(e *sdk.NoteEvent, gc *github.GenericCommentEvent) {
 	pr := e.PullRequest
 	gc.IsPR = true
 	gc.IssueState = pr.State
-	gc.IssueAuthor.Login = pr.Head.User.Login
+	gc.IssueAuthor.Login = pr.User.Login
 	gc.Number = int(pr.Number)
 	gc.IssueBody = pr.Body
 	gc.IssueHTMLURL = pr.HtmlUrl
 	gc.Assignees = convertAssignees(pr.Assignees)
 }
 
-func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent {
+func ConvertPullRequestEvent(e *sdk.PullRequestEvent) github.PullRequestEvent {
 	epr := e.PullRequest
 	pe := github.PullRequestEvent{
 		Action: ConvertPullRequestAction(e),
@@ -83,8 +86,8 @@ func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent 
 				SHA: epr.Head.Sha,
 			},
 			User: github.User{
-				Login:   epr.Head.User.Login,
-				HTMLURL: epr.Head.User.HtmlUrl,
+				Login:   epr.User.Login,
+				HTMLURL: epr.User.HtmlUrl,
 			},
 			Number:   int(epr.Number),
 			HTMLURL:  epr.HtmlUrl,
@@ -101,7 +104,7 @@ func ConvertPullRequestEvent(e *gitee.PullRequestEvent) github.PullRequestEvent 
 	return pe
 }
 
-func ConvertPushEvent(e *gitee.PushEvent) github.PushEvent {
+func ConvertPushEvent(e *sdk.PushEvent) github.PushEvent {
 	pe := github.PushEvent{
 		GUID:    "", //TODO
 		Ref:     *(e.Ref),
@@ -119,7 +122,7 @@ func ConvertPushEvent(e *gitee.PushEvent) github.PushEvent {
 	return pe
 }
 
-func convertPushCommits(e *gitee.PushEvent) []github.Commit {
+func convertPushCommits(e *sdk.PushEvent) []github.Commit {
 	r := make([]github.Commit, 0, len(e.Commits))
 	for _, i := range e.Commits {
 		r = append(r, github.Commit{
@@ -133,7 +136,7 @@ func convertPushCommits(e *gitee.PushEvent) []github.Commit {
 	return r
 }
 
-func ConvertPullRequestAction(e *gitee.PullRequestEvent) github.PullRequestEventAction {
+func ConvertPullRequestAction(e *sdk.PullRequestEvent) github.PullRequestEventAction {
 	var a github.PullRequestEventAction
 
 	switch strings.ToLower(*(e.Action)) {
@@ -155,7 +158,7 @@ func ConvertPullRequestAction(e *gitee.PullRequestEvent) github.PullRequestEvent
 	return a
 }
 
-func convertPullRequestLabel(e *gitee.PullRequestEvent) []github.Label {
+func convertPullRequestLabel(e *sdk.PullRequestEvent) []github.Label {
 	/*
 		r := make([]github.Label, 0, len(e.PullRequest.Labels))
 
@@ -165,4 +168,61 @@ func convertPullRequestLabel(e *gitee.PullRequestEvent) []github.Label {
 		return r
 	*/
 	return []github.Label{}
+}
+
+func checkNoteEvent(e *sdk.NoteEvent) error {
+	eventType := "note event"
+	ne := gitee.NewNoteEventWrapper(e)
+	if ne.Comment == nil {
+		return fmtCheckError(eventType, "comment")
+	}
+	if ne.IsPullRequest() {
+		if err := checkPullRequestHook(ne.PullRequest, eventType); err != nil {
+			return err
+		}
+	}
+	if ne.IsIssue() && ne.Issue == nil {
+		return fmtCheckError(eventType, "issue")
+	}
+	return checkRepository(e.Repository, eventType)
+}
+
+func checkIssueEvent(e *sdk.IssueEvent) error {
+	eventType := "issue event"
+	if e.Issue == nil {
+		return fmtCheckError(eventType, "issue")
+	}
+	return checkRepository(e.Repository, eventType)
+}
+
+func checkPullRequestEvent(e *sdk.PullRequestEvent) error {
+	eventType := "pull request event"
+	if err := checkPullRequestHook(e.PullRequest, eventType); err != nil {
+		return err
+	}
+	return checkRepository(e.Repository, eventType)
+}
+
+func checkPullRequestHook(pr *sdk.PullRequestHook, eventType string) error {
+	if pr == nil {
+		return fmtCheckError(eventType, "pull_request")
+	}
+	if pr.Head == nil || pr.Base == nil {
+		return fmtCheckError(eventType, "pull_request.head or pull_request.base")
+	}
+	return nil
+}
+
+func checkRepository(rep *sdk.ProjectHook, eventType string) error {
+	if rep == nil {
+		return fmtCheckError(eventType, "pull_request")
+	}
+	if rep.Namespace == "" || rep.Path == "" {
+		return fmtCheckError(eventType, "pull_request.namespace or pull_request.path")
+	}
+	return nil
+}
+
+func fmtCheckError(eventType, field string) error {
+	return fmt.Errorf("%s is illegal: the %s field is empty", eventType, field)
 }
