@@ -11,7 +11,7 @@ func NewClientFactoryOnPV(opt ClientFactoryOpt) (ClientFactory, error) {
 
 	cacheDir := path.Join(*option.CacheDirBase, option.Host, "gitcache")
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		if err := os.Mkdir(cacheDir, 0732); err != nil {
+		if err := os.MkdirAll(cacheDir, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
