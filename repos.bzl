@@ -3827,8 +3827,8 @@ def go_repositories():
         build_file_generation = "on",
         build_file_proto_mode = "disable",
         importpath = "gitee.com/openeuler/go-gitee",
-        sum = "h1:LEx9gXpBavxcb0oXPGvdLNqEMjh5jOTJzKgm8nmRppY=",
-        version = "v0.0.0-20210324035702-6b6bb8bae08d",
+        sum = "h1:yaBMJHyJRAMHpub4ehCcTsN9ERgI4uDqbJ5VUU+J740=",
+        version = "v0.0.0-20210422121223-2bdd52c8bcf8",
     )
     go_repository(
         name = "com_github_antihax_optional",

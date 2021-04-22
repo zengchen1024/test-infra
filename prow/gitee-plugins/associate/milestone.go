@@ -22,7 +22,7 @@ type milestoneClient interface {
 }
 
 func handleIssueCreate(ghc milestoneClient, e *sdk.IssueEvent, log *log.Entry) error {
-	if e.Milestone != nil && e.Milestone.Id != 0 {
+	if e.Issue.Milestone != nil && e.Issue.Milestone.Id != 0 {
 		log.Debug(fmt.Sprintf("Milestones have been set when the issue (%s)was created", e.Issue.Number))
 		return nil
 	}
