@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"path"
 )
@@ -21,7 +22,10 @@ func NewClientFactoryOnPV(opt ClientFactoryOpt) (ClientFactory, error) {
 		return nil, err
 	}
 
-	c := f.(*clientFactory)
+	c, ok := f.(*clientFactory)
+	if !ok {
+		return nil, fmt.Errorf("Error to convert git client factory")
+	}
 
 	old := c.cacheDir
 	c.cacheDir = cacheDir
