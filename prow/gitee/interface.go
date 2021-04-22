@@ -23,6 +23,7 @@ type Client interface {
 	CreatePRComment(org, repo string, number int, comment string) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	AddPRLabel(org, repo string, number int, label string) error
+	AddMultiPRLabel(org, repo string, number int, label []string) error
 	RemovePRLabel(org, repo string, number int, label string) error
 
 	ClosePR(org, repo string, number int) error
@@ -41,6 +42,8 @@ type Client interface {
 	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
 
 	GetRepos(org string) ([]sdk.Project, error)
+	GetRepoLabels(owner, repo string) ([]sdk.Label, error)
+
 	RemoveIssueLabel(org, repo, number, label string) error
 	AddIssueLabel(org, repo, number, label string) error
 	AddMultiIssueLabel(org, repo, number string, label []string) error

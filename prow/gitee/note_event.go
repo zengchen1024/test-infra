@@ -5,10 +5,12 @@ import sdk "gitee.com/openeuler/go-gitee/gitee"
 const (
 	//StatusOpen gitee issue or pr status is open
 	StatusOpen = "open"
-	//StatusOpen gitee issue or pr status is closed
+	//StatusClosed gitee issue or pr status is closed
 	StatusClosed = "closed"
 )
 
+//NoteEventWrapper a wrapper for the event of the comment to
+//provide common methods for obtaining comment related information
 type NoteEventWrapper struct {
 	*sdk.NoteEvent
 }
@@ -43,6 +45,8 @@ func (ne NoteEventWrapper) IsIssue() bool {
 	return *(ne.NoteableType) == "Issue"
 }
 
+//IssueNoteEvent a wrapper for the event of the comment issue
+//to provide methods for obtaining issue related information
 type IssueNoteEvent struct {
 	NoteEventWrapper
 }
@@ -67,6 +71,8 @@ func (ne IssueNoteEvent) GetIssueNumber() string {
 	return ne.Issue.Number
 }
 
+//PRNoteEvent a wrapper for the event of the comment pullrequest
+//to provide methods for obtaining pullrequest related information
 type PRNoteEvent struct {
 	NoteEventWrapper
 }
@@ -86,16 +92,19 @@ func (ne PRNoteEvent) IsPROpen() bool {
 	return ne.PullRequest.State == StatusOpen
 }
 
+//NewNoteEventWrapper create a wrapper for comment events
 func NewNoteEventWrapper(e *sdk.NoteEvent) NoteEventWrapper {
 	return NoteEventWrapper{NoteEvent: e}
 }
 
+//NewIssueNoteEvent create a wrapper for the issue's comment event
 func NewIssueNoteEvent(e *sdk.NoteEvent) IssueNoteEvent {
 	return IssueNoteEvent{
 		NoteEventWrapper: NoteEventWrapper{NoteEvent: e},
 	}
 }
 
+//NewPRNoteEvent create a wrapper for the pr's comment event
 func NewPRNoteEvent(e *sdk.NoteEvent) PRNoteEvent {
 	return PRNoteEvent{
 		NoteEventWrapper: NoteEventWrapper{NoteEvent: e},
