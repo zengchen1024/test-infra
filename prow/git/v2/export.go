@@ -22,6 +22,10 @@ func NewClientFactoryOnPV(opt ClientFactoryOpt) (ClientFactory, error) {
 	}
 
 	c := f.(*clientFactory)
+
+	old := c.cacheDir
 	c.cacheDir = cacheDir
+	os.RemoveAll(old)
+
 	return c, nil
 }
