@@ -367,7 +367,7 @@ func (ha *HelpAgent) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serverError("reading request body", err)
 		return
 	}
-	help := ha.GeneratePluginHelp()
+	help := ha.GeneratePluginHelpRestrictedToConfig()
 	b, err = json.Marshal(help)
 	if err != nil {
 		serverError("marshaling plugin help", err)

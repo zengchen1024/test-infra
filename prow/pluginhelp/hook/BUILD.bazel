@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["hook.go"],
+    srcs = [
+      "export.go",
+      "hook.go",
+    ],
     importpath = "k8s.io/test-infra/prow/pluginhelp/hook",
     visibility = ["//visibility:public"],
     deps = [
