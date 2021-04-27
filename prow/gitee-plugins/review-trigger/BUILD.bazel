@@ -3,9 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "clone.go",
+        "client.go",
+        "review.go",
     ],
-    importpath = "k8s.io/test-infra/prow/gitee-plugins/clone-repo",
+    importpath = "k8s.io/test-infra/prow/gitee-plugins/review-trigger",
     visibility = ["//visibility:public"],
     deps = [
         "//prow/config:go_default_library",
