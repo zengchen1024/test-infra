@@ -43,7 +43,7 @@ func initPlugins(cfg prowConfig.Getter, agent *plugins.ConfigAgent, pm plugins.P
 	v = append(v, checkpr.NewCheckPr(gpc, cs.giteeClient))
 	v = append(v, lifecycle.NewLifeCycle(gpc, cs.giteeClient))
 	v = append(v, label.NewLabel(gpc, cs.giteeClient))
-	v = append(v, reviewtrigger.NewPlugin(cs.giteeGitClient, cs.giteeClient))
+	v = append(v, reviewtrigger.NewPlugin(gpc, cs.giteeClient, botname, cs.ownersClient))
 
 	for _, i := range v {
 		name := i.PluginName()

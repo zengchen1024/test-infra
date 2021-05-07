@@ -377,6 +377,16 @@ func (c *client) IsMember(org, login string) (bool, error) {
 	return true, nil
 }
 
+func (c *client) GetPRCommit(org, repo, SHA string) (sdk.RepoCommit, error) {
+	v, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCommitsSha(
+		context.Background(), org, repo, SHA, nil)
+	if err != nil {
+		return v, formatErr(err, "get commit info")
+	}
+
+	return v, nil
+}
+
 func (c *client) GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error) {
 	var r github.SingleCommit
 

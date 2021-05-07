@@ -219,6 +219,7 @@ type RepoOwner interface {
 	Approvers(path string) sets.String
 	LeafReviewers(path string) sets.String
 	Reviewers(path string) sets.String
+	AllReviewers() sets.String
 	RequiredReviewers(path string) sets.String
 	ParseSimpleConfig(path string) (SimpleConfig, error)
 	ParseFullConfig(path string) (FullConfig, error)
@@ -864,4 +865,23 @@ func (o *RepoOwners) RequiredReviewers(path string) sets.String {
 
 func (o *RepoOwners) TopLevelApprovers() sets.String {
 	return o.entriesForFile(".", o.approvers, false)
+}
+
+func (o *RepoOwners) AllReviewers() sets.String {
+	r := sets.NewString()
+
+	f := func(s map[string]map[*regexp.Regexp]sets.String) {
+		for _, v := range s {
+			for _, v1 := range v {
+				for k := range v1 {
+					r.Insert(k)
+				}
+			}
+		}
+	}
+
+	f(o.approvers)
+	f(o.reviewers)
+
+	return r
 }
