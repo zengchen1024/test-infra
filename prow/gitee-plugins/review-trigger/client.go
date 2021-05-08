@@ -15,6 +15,7 @@ type giteeClient interface {
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	CreatePRComment(owner, repo string, number int, comment string) error
+	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
 }

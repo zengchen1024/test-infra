@@ -121,3 +121,9 @@ type pluginConfig struct {
 
 	runningStatusOfJob string
 }
+
+func (p pluginConfig) labelsForCI() []string {
+	return []string{
+		p.LabelForCIFailed, p.LabelForCIPassed, p.LabelForCIRunning,
+	}
+}

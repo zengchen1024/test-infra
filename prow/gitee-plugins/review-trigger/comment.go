@@ -1,11 +1,14 @@
 package reviewtrigger
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/test-infra/prow/gitee"
+	op "k8s.io/test-infra/prow/plugins"
 )
 
 func (rt *trigger) inferApproversReviewers(org, repo, branch string, prNumber int) (map[string]sets.String, sets.String, error) {
@@ -40,7 +43,6 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent) (reviewState, error) {
 	if err != nil {
 		return reviewState{}, err
 	}
-	approverDirMap := parseApprovers(dirApproverMap)
 
 	cfg, err := rt.orgRepoConfig(org, repo)
 	if err != nil {
@@ -53,10 +55,11 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent) (reviewState, error) {
 		headSHA:        ne.PullRequest.Head.Sha,
 		botName:        rt.botName,
 		prNumber:       ne.GetPRNumber(),
+		currentLabels:  gitee.GetLabelFromEvent(ne.PullRequest.Labels),
 		c:              rt.client,
 		cfg:            cfg,
 		dirApproverMap: dirApproverMap,
-		approverDirMap: approverDirMap,
+		approverDirMap: parseApprovers(dirApproverMap),
 		reviewers:      reviewers,
 	}
 	return s, nil
@@ -68,56 +71,33 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) erro
 		return err
 	}
 
-	if !rs.reviewers.Has(ne.GetCommenter()) {
+	commenter := ne.GetCommenter()
+	if !rs.reviewers.Has(commenter) {
 		return nil
 	}
 
-	_, isApprover := rs.approverDirMap[ne.GetCommenter()]
-
+	notApprover := !rs.isApprover(commenter)
+	invalid := false
 	for _, cmd := range cmds {
-		if cmdBelongsToApprover[cmd] && !isApprover {
-			// write comment
+		if cmdBelongsToApprover.Has(cmd) && notApprover {
+			invalid = true
+			break
 		}
+	}
+	if invalid {
+		rt.client.CreatePRComment(
+			rs.org, rs.repo, rs.prNumber,
+			op.FormatResponseRaw(
+				ne.GetComment(), ne.Comment.HtmlUrl, commenter,
+				fmt.Sprintf(
+					"These commands such as %s are restricted to approvers in OWNERS files.",
+					strings.Join(cmdBelongsToApprover.List(), ", "),
+				),
+			),
+		)
 	}
 
 	return rs.handle(false)
-}
-
-func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent) error {
-	org, repo := ne.GetOrgRep()
-	cfg, err := rt.orgRepoConfig(org, repo)
-	if err != nil {
-		return err
-	}
-
-	status := parseCIStatus(cfg, ne.GetComment())
-	if status == "" {
-		return nil
-	}
-
-	if status == cfg.SuccessStatusOfJob {
-		rs, err := rt.newReviewState(ne)
-		if err != nil {
-			return err
-		}
-		rs.handle(true)
-	}
-
-	if cfg.EnableLabelForCI {
-		l := ""
-		switch status {
-		case cfg.SuccessStatusOfJob:
-			l = cfg.LabelForCIPassed
-		case cfg.runningStatusOfJob:
-			l = cfg.LabelForCIRunning
-		case cfg.FailureStatusOfJob:
-			l = cfg.LabelForCIFailed
-		}
-
-		rt.client.AddPRLabel(org, repo, ne.GetPRNumber(), l)
-	}
-
-	return nil
 }
 
 func parseApprovers(dirApproverMap map[string]sets.String) map[string]sets.String {

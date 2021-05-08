@@ -13,35 +13,6 @@ var (
 	notificationRe    = regexp.MustCompile("^\\[Approval Notifier\\] This Pull-Request")
 )
 
-func (rs reviewState) applyLabel(label string, isCIPassed bool, reviewComments []*sComment, allComments []sdk.PullRequestComments) error {
-	cls, err := rs.c.getPRCurrentLabels(rs.org, rs.repo, rs.prNumber)
-	if err != nil {
-		return err
-	}
-
-	desc := ""
-	switch label {
-	case labelRequestChange:
-		rs.applyRequestChangeLabel(cls)
-		desc = updateTips(label, reviewComments)
-	case labelLGTM:
-		rs.applyLGTMLabel(cls)
-		if isCIPassed || cls[rs.cfg.LabelForCIPassed] {
-			desc = createTips(reviewComments)
-		}
-	case labelApproved:
-		rs.applyApprovedLabel(cls)
-		desc = updateTips(label, reviewComments)
-	}
-
-	tips := findApproveTips(allComments)
-	if tips != nil && tips.Body != desc {
-		return rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc)
-	}
-
-	return rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
-}
-
 func createTips(reviewComments []*sComment) string {
 	approvers, _ := statApprover(reviewComments)
 
@@ -83,12 +54,12 @@ func updateTips(label string, reviewComments []*sComment) string {
 
 func statApprover(reviewComments []*sComment) ([]string, []string) {
 	r := map[string][]string{
-		cmdReject:  []string{},
-		cmdAPPROVE: []string{},
+		cmdReject:  {},
+		cmdAPPROVE: {},
 	}
 
 	for _, c := range reviewComments {
-		if cmdBelongsToApprover[c.comment] {
+		if cmdBelongsToApprover.Has(c.comment) {
 			r[c.comment] = append(r[c.comment], c.author)
 		}
 	}
@@ -96,9 +67,12 @@ func statApprover(reviewComments []*sComment) ([]string, []string) {
 	return r[cmdAPPROVE], r[cmdReject]
 }
 
-func findApproveTips(allComments []sdk.PullRequestComments) *sdk.PullRequestComments {
+func findApproveTips(allComments []sdk.PullRequestComments, botName string) *sdk.PullRequestComments {
 	for i := range allComments {
 		tips := &allComments[i]
+		if tips.User == nil || tips.User.Login != botName {
+			continue
+		}
 		if notificationRe.MatchString(tips.Body) {
 			return tips
 		}

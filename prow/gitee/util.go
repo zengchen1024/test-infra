@@ -13,3 +13,11 @@ func GetOwnerAndRepoByPREvent(pre *sdk.PullRequestEvent) (string, string) {
 func GetOwnerAndRepoByIssueEvent(issue *sdk.IssueEvent) (string, string) {
 	return issue.Repository.Namespace, issue.Repository.Path
 }
+
+func GetLabelFromEvent(labels []sdk.LabelHook) map[string]bool {
+	m := map[string]bool{}
+	for i := range labels {
+		m[labels[i].Name] = true
+	}
+	return m
+}

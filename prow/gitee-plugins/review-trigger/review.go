@@ -1,9 +1,7 @@
 package reviewtrigger
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
@@ -39,26 +37,26 @@ func NewPlugin(f plugins.GetPluginConfig, gc giteeClient, botName string, oc rep
 	}
 }
 
-func (cr *trigger) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
+func (rt *trigger) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp, error) {
 	pluginHelp := &pluginhelp.PluginHelp{
-		Description: `The review_trigger plugin will trigger the whole review process. first, it will clone repo in advance and
-		save it at local disk when the pr is created in order to same the time for other operation, such as lgtm, approve. second
-		it will handle comment of reviewer and approver, such as /lgtm, /lbtm, /approve and /reject.
+		Description: `The review_trigger plugin will trigger the whole review process to merge pull-request.
+		It will handle comment of reviewer and approver, such as /lgtm, /lbtm, /approve and /reject.
+		Also, it can add label of CI test cases.
 		`,
 	}
 	return pluginHelp, nil
 }
 
-func (cr *trigger) PluginName() string {
+func (rt *trigger) PluginName() string {
 	return "review_trigger"
 }
 
-func (cr *trigger) NewPluginConfig() plugins.PluginConfig {
+func (rt *trigger) NewPluginConfig() plugins.PluginConfig {
 	return &configuration{}
 }
 
-func (cr *trigger) orgRepoConfig(org, repo string) (*pluginConfig, error) {
-	cfg, err := cr.pluginConfig()
+func (rt *trigger) orgRepoConfig(org, repo string) (*pluginConfig, error) {
+	cfg, err := rt.pluginConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +69,8 @@ func (cr *trigger) orgRepoConfig(org, repo string) (*pluginConfig, error) {
 	return pc, nil
 }
 
-func (cr *trigger) pluginConfig() (*configuration, error) {
-	c := cr.getPluginConfig(cr.PluginName())
+func (rt *trigger) pluginConfig() (*configuration, error) {
+	c := rt.getPluginConfig(rt.PluginName())
 	if c == nil {
 		return nil, fmt.Errorf("can't find the configuration")
 	}
@@ -84,19 +82,20 @@ func (cr *trigger) pluginConfig() (*configuration, error) {
 
 	return c1, nil
 }
-func (cr *trigger) RegisterEventHandler(p plugins.Plugins) {
-	name := cr.PluginName()
-	p.RegisterNoteEventHandler(name, cr.handleNoteEvent)
-	p.RegisterPullRequestHandler(name, cr.clone)
+func (rt *trigger) RegisterEventHandler(p plugins.Plugins) {
+	name := rt.PluginName()
+	p.RegisterNoteEventHandler(name, rt.handleNoteEvent)
+	p.RegisterPullRequestHandler(name, rt.handlePREvent)
 }
 
-func (cr *trigger) clone(e *sdk.PullRequestEvent, log *logrus.Entry) error {
+func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
 	action := plugins.ConvertPullRequestAction(e)
+	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
+	prNumber := int(e.PullRequest.Number)
 	switch action {
 	case github.PullRequestActionOpened:
-		org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 
-		err := cr.client.AddPRLabel(org, repo, int(e.PullRequest.Number), labelCanReview)
+		err := rt.client.AddPRLabel(org, repo, prNumber, labelCanReview)
 		// suggest reviewer
 
 		// no need to update local repo everytime when a pr is open.
@@ -104,21 +103,23 @@ func (cr *trigger) clone(e *sdk.PullRequestEvent, log *logrus.Entry) error {
 		return err
 
 	case github.PullRequestActionSynchronize:
-		err := removeInvalidLabels(e, cr.client, true)
+		errs := newErrors()
+		if err := rt.removeInvalidLabels(e, true); err != nil {
+			errs.add(fmt.Sprintf("remove label when source code changed, err:%s", err.Error()))
+		}
 		// suggest reviewer
-		// delete the approver tips comment
-		return err
+
+		if err := rt.deleteTips(org, repo, prNumber); err != nil {
+			errs.add(fmt.Sprintf("delete tips, err:%s", err.Error()))
+		}
+		return errs.err()
 
 	}
 	return nil
 }
 
-func removeInvalidLabels(e *sdk.PullRequestEvent, c giteeClient, canReview bool) error {
-	labels := e.PullRequest.Labels
-	m := map[string]bool{}
-	for i := range labels {
-		m[labels[i].Name] = true
-	}
+func (rt *trigger) removeInvalidLabels(e *sdk.PullRequestEvent, canReview bool) error {
+	m := gitee.GetLabelFromEvent(e.PullRequest.Labels)
 
 	rml := []string{labelApproved, labelRequestChange, labelLGTM}
 	if !canReview {
@@ -128,24 +129,34 @@ func removeInvalidLabels(e *sdk.PullRequestEvent, c giteeClient, canReview bool)
 	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 	number := int(e.PullRequest.Number)
 
-	errs := []string{}
+	errs := newErrors()
 	for _, l := range rml {
 		if m[l] {
-			if err := c.RemovePRLabel(org, repo, number, l); err != nil {
-				errs = append(errs, fmt.Sprintf("remove label:%s, err:%v", l, err))
+			if err := rt.client.RemovePRLabel(org, repo, number, l); err != nil {
+				errs.add(fmt.Sprintf("remove label:%s, err:%v", l, err))
 			}
 		}
 	}
 
 	l := labelCanReview
 	if canReview && !m[l] {
-		if err := c.AddPRLabel(org, repo, number, l); err != nil {
-			errs = append(errs, fmt.Sprintf("add label:%s, err:%v", l, err))
+		if err := rt.client.AddPRLabel(org, repo, number, l); err != nil {
+			errs.add(fmt.Sprintf("add label:%s, err:%v", l, err))
 		}
 	}
 
-	if len(errs) != 0 {
-		return errors.New(strings.Join(errs, ". "))
+	return errs.err()
+}
+
+func (rt *trigger) deleteTips(org, repo string, prNumber int) error {
+	comments, err := rt.client.ListPRComments(org, repo, prNumber)
+	if err != nil {
+		return err
+	}
+
+	tips := findApproveTips(comments, rt.botName)
+	if tips != nil {
+		return rt.client.DeletePRComment(org, repo, int(tips.Id))
 	}
 	return nil
 }
