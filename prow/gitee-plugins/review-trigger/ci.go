@@ -25,16 +25,12 @@ func parseJobComment(s string) (string, error) {
 	return "", fmt.Errorf("invalid job comment")
 }
 
-type ciCommentParser struct {
-	jobsResultNotificationRe *regexp.Regexp
-}
+func parseCIComment(cfg *pluginConfig, comment string) []string {
+	s := strings.ReplaceAll(cfg.TitleOfCITable, "|", "\\|")
+	s = "(.*)" + s + "(.*)\n([\\s\\S]*)"
+	exp := regexp.MustCompile(s)
 
-func (j ciCommentParser) IsCIComment(comment string) bool {
-	return j.jobsResultNotificationRe.MatchString(comment)
-}
-
-func (j ciCommentParser) ParseComment(comment string) []string {
-	m := j.jobsResultNotificationRe.FindStringSubmatch(comment)
+	m := exp.FindStringSubmatch(comment)
 	if m == nil {
 		return nil
 	}
@@ -55,29 +51,19 @@ func (j ciCommentParser) ParseComment(comment string) []string {
 	return r
 }
 
-func newCICommentParser(title string) ciCommentParser {
-	s := strings.ReplaceAll(title, "|", "\\|")
-	s = "(.*)" + s + "(.*)\n([\\s\\S]*)"
-
-	return ciCommentParser{
-		jobsResultNotificationRe: regexp.MustCompile(s),
-	}
-}
-
 func parseCIStatus(cfg *pluginConfig, comment string) string {
-	parser := newCICommentParser(cfg.TitleOfCITable)
-	if !parser.IsCIComment(comment) {
+	r := parseCIComment(cfg, comment)
+	if len(r) == 0 {
 		return ""
 	}
 
-	r := parser.ParseComment(comment)
 	running := false
 	for _, item := range r {
 		if strings.Contains(item, cfg.FailureStatusOfJob) {
 			return cfg.FailureStatusOfJob
 		}
 
-		if !strings.Contains(item, cfg.SuccessStatusOfJob) {
+		if !running && !strings.Contains(item, cfg.SuccessStatusOfJob) {
 			running = true
 		}
 	}
@@ -116,18 +102,10 @@ func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent) error {
 	}
 
 	if cfg.EnableLabelForCI {
-		l := ""
-		switch status {
-		case cfg.SuccessStatusOfJob:
-			l = cfg.LabelForCIPassed
-		case cfg.runningStatusOfJob:
-			l = cfg.LabelForCIRunning
-		case cfg.FailureStatusOfJob:
-			l = cfg.LabelForCIFailed
-		}
+		l := cfg.statusToLabel(status)
 
 		if err := updatePRCILabel(ne, l, cfg, rt.client); err != nil {
-			errs.add(err.Error())
+			errs.addError(err)
 		}
 	}
 
@@ -146,13 +124,13 @@ func updatePRCILabel(ne gitee.PRNoteEvent, label string, cfg *pluginConfig, clie
 	for _, item := range cfg.labelsForCI() {
 		if m[item] {
 			if err := client.RemovePRLabel(org, repo, prNumber, item); err != nil {
-				errs.add(err.Error())
+				errs.addError(err)
 			}
 		}
 	}
 
 	if err := client.AddPRLabel(org, repo, prNumber, label); err != nil {
-		errs.add(err.Error())
+		errs.addError(err)
 	}
 	return errs.err()
 }

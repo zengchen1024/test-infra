@@ -87,8 +87,8 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 		}
 		if cmd := rs.getCommands(c); cmd != "" {
 			c.comment = cmd
-			m[c.author] = true
 			validComments = append(validComments, c)
+			m[c.author] = true
 		}
 	}
 
@@ -113,9 +113,9 @@ func (rs reviewState) getCommands(c *sComment) string {
 	lastCmd := ""
 	negativeNum := 0
 	positiveNum := 0
-	_, isApprover := rs.approverDirMap[c.author]
+	notApprover := !rs.isApprover(c.author)
 	for _, cmd := range cmds {
-		if cmdBelongsToApprover.Has(cmd) && !isApprover {
+		if cmdBelongsToApprover.Has(cmd) && notApprover {
 			continue
 		}
 		lastCmd = cmd
@@ -154,7 +154,6 @@ func (rs reviewState) applyComments(comments []*sComment) string {
 		cmd := c.comment
 		if cmdBelongsToApprover.Has(cmd) {
 			dirs := rs.approverDirMap[c.author]
-
 			cmd1 := m[cmd]
 			for k := range records {
 				if dirs.Has(k) {

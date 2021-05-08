@@ -127,3 +127,16 @@ func (p pluginConfig) labelsForCI() []string {
 		p.LabelForCIFailed, p.LabelForCIPassed, p.LabelForCIRunning,
 	}
 }
+
+func (p pluginConfig) statusToLabel(status string) string {
+	l := ""
+	switch status {
+	case p.SuccessStatusOfJob:
+		l = p.LabelForCIPassed
+	case p.runningStatusOfJob:
+		l = p.LabelForCIRunning
+	case p.FailureStatusOfJob:
+		l = p.LabelForCIFailed
+	}
+	return l
+}
