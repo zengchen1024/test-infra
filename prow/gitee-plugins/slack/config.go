@@ -3,10 +3,13 @@ package slack
 import "fmt"
 
 type configuration struct {
-	Slack slackConfig `json:"slack,omitempty"`
+	Slack *slackConfig `json:"slack,omitempty"`
 }
 
 func (c *configuration) Validate() error {
+	if c.Slack == nil {
+		return nil
+	}
 	if c.Slack.RobotChannel == "" {
 		return fmt.Errorf("robot_channel must be set")
 	}

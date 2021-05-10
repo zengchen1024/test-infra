@@ -8,16 +8,26 @@ import (
 )
 
 type configuration struct {
-	Trigger []pluginConfig `json:"review_trigger,omitempty"`
+	Trigger *confTrigger `json:"review_trigger,omitempty"`
+}
+
+type confTrigger struct {
+	CommandsLink string         `json:"commands_link" required:"true"`
+	Trigger      []pluginConfig `json:"trigger,omitempty"`
 }
 
 func (c *configuration) Validate() error {
+	if c.Trigger == nil {
+		return nil
+	}
+
 	if _, err := golangsdk.BuildRequestBody(c, ""); err != nil {
 		return err
 	}
 
-	for i := range c.Trigger {
-		item := &c.Trigger[i]
+	t := c.Trigger.Trigger
+	for i := range t {
+		item := &t[i]
 
 		if _, err := parseJobComment(item.TitleOfCITable); err != nil {
 			return fmt.Errorf("the format of `title_of_ci_table` is not correct")
@@ -41,8 +51,13 @@ func (c *configuration) Validate() error {
 }
 
 func (c *configuration) SetDefault() {
-	for i := range c.Trigger {
-		item := &c.Trigger[i]
+	if c.Trigger == nil {
+		return
+	}
+
+	t := c.Trigger.Trigger
+	for i := range t {
+		item := &t[i]
 		if item.NumberOfApprovers <= 0 {
 			item.NumberOfApprovers = 1
 		}
@@ -52,11 +67,15 @@ func (c *configuration) SetDefault() {
 }
 
 func (c *configuration) TriggerFor(org, repo string) *pluginConfig {
-	fullName := fmt.Sprintf("%s/%s", org, repo)
+	if c.Trigger == nil {
+		return nil
+	}
 
+	fullName := fmt.Sprintf("%s/%s", org, repo)
 	index := -1
-	for i := range c.Trigger {
-		item := &(c.Trigger[i])
+	t := c.Trigger.Trigger
+	for i := range t {
+		item := &(t[i])
 
 		s := sets.NewString(item.Repos...)
 		if s.Has(fullName) {
@@ -69,7 +88,7 @@ func (c *configuration) TriggerFor(org, repo string) *pluginConfig {
 	}
 
 	if index >= 0 {
-		return &(c.Trigger[index])
+		return &(t[index])
 	}
 
 	return nil
@@ -78,6 +97,10 @@ func (c *configuration) TriggerFor(org, repo string) *pluginConfig {
 type pluginConfig struct {
 	// Repos is either of the form org/repos or just org.
 	Repos []string `json:"repos" required:"true"`
+
+	// AllowSelfApprove is the tag which indicate if the author
+	// can appove his/her own pull-request.
+	AllowSelfApprove bool `json:"allow_self_approve"`
 
 	// NumberOfApprovers is the min number of approvers who commented
 	// /approve at same time to merge the single module

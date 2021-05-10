@@ -10,6 +10,7 @@ type reviewState struct {
 	repo           string
 	headSHA        string
 	botName        string
+	prAuthor       string
 	prNumber       int
 	currentLabels  map[string]bool
 	c              ghclient

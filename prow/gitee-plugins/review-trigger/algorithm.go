@@ -40,6 +40,18 @@ func parseCommandFromComment(comment string) []string {
 	return r
 }
 
+func canApplyCmd(cmd string, isPRAuthor, isApprover, allowSelfApprove bool) bool {
+	switch cmd {
+	case cmdReject:
+		return (isPRAuthor || isApprover)
+	case cmdLGTM:
+		return !isPRAuthor
+	case cmdAPPROVE:
+		return isApprover && (allowSelfApprove || !isPRAuthor)
+	}
+	return true
+}
+
 // first. filter comments and omit each one
 // which is before the pr code update time
 // or which is not a reviewer
@@ -113,11 +125,18 @@ func (rs reviewState) getCommands(c *sComment) string {
 	lastCmd := ""
 	negativeNum := 0
 	positiveNum := 0
-	notApprover := !rs.isApprover(c.author)
+	check := func(cmd string) bool {
+		return canApplyCmd(
+			cmd, rs.prAuthor == c.author,
+			rs.isApprover(c.author), rs.cfg.AllowSelfApprove,
+		)
+	}
+
 	for _, cmd := range cmds {
-		if cmdBelongsToApprover.Has(cmd) && notApprover {
+		if !check(cmd) {
 			continue
 		}
+
 		lastCmd = cmd
 		if v, ok := negatives[cmd]; ok {
 			if !v {

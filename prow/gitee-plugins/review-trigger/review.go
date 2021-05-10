@@ -49,7 +49,7 @@ func (rt *trigger) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp,
 		Usage:       "/lgtm",
 		Description: "The code looks good. It will add 'lgtm' label if reviewer comment /lgtm",
 		Featured:    true,
-		WhoCanUse:   "Anyone",
+		WhoCanUse:   "Anyone except the author of pull-request",
 		Examples:    []string{"/lgtm"},
 	})
 	pluginHelp.AddCommand(pluginhelp.Command{
@@ -63,14 +63,14 @@ func (rt *trigger) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp,
 		Usage:       "/approve",
 		Description: "The code is ready to be merged. It may add 'approved' label if approver comment /approve",
 		Featured:    true,
-		WhoCanUse:   "approver",
+		WhoCanUse:   "The approver",
 		Examples:    []string{"/approve"},
 	})
 	pluginHelp.AddCommand(pluginhelp.Command{
 		Usage:       "/reject",
 		Description: "The code can't be merged. It will add 'request-change' label if approver comment /reject",
 		Featured:    true,
-		WhoCanUse:   "approver",
+		WhoCanUse:   "The approver or the author of pull-request",
 		Examples:    []string{"/reject"},
 	})
 

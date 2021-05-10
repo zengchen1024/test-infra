@@ -3,7 +3,6 @@ package reviewtrigger
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -54,6 +53,7 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent) (reviewState, error) {
 		repo:           repo,
 		headSHA:        ne.PullRequest.Head.Sha,
 		botName:        rt.botName,
+		prAuthor:       ne.PullRequest.User.Login,
 		prNumber:       ne.GetPRNumber(),
 		currentLabels:  gitee.GetLabelFromEvent(ne.PullRequest.Labels),
 		c:              rt.client,
@@ -72,18 +72,23 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) erro
 	}
 
 	commenter := ne.GetCommenter()
-	notApprover := !rs.isApprover(commenter)
+	check := func(cmd string) bool {
+		return canApplyCmd(
+			cmd, rs.prAuthor == commenter,
+			rs.isApprover(commenter), rs.cfg.AllowSelfApprove,
+		)
+	}
+
 	for _, cmd := range cmds {
-		if cmdBelongsToApprover.Has(cmd) && notApprover {
+		if !check(cmd) {
+			cfg, _ := rt.pluginConfig()
+			s := fmt.Sprintf(
+				"You can't use command of %s. Please see the [command usage](%s) to get detail",
+				cmd, cfg.Trigger.CommandsLink,
+			)
 			rt.client.CreatePRComment(
 				rs.org, rs.repo, rs.prNumber,
-				op.FormatResponseRaw(
-					ne.GetComment(), ne.Comment.HtmlUrl, commenter,
-					fmt.Sprintf(
-						"These commands such as %s are restricted to approvers in OWNERS files.",
-						strings.Join(cmdBelongsToApprover.List(), ", "),
-					),
-				),
+				op.FormatResponseRaw(ne.GetComment(), ne.Comment.HtmlUrl, commenter, s),
 			)
 
 			break
