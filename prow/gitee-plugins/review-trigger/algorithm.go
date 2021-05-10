@@ -19,6 +19,8 @@ const (
 
 var (
 	validCmds            = sets.NewString(cmdLGTM, cmdLBTM, cmdAPPROVE, cmdReject)
+	negativeCmds         = sets.NewString(cmdReject, cmdLBTM)
+	positiveCmds         = sets.NewString(cmdAPPROVE, cmdLGTM)
 	cmdBelongsToApprover = sets.NewString(cmdAPPROVE, cmdReject)
 	commandRegex         = regexp.MustCompile(`(?m)^/([^\s]+)[\t ]*([^\n\r]*)`)
 )
@@ -89,18 +91,18 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTime time.Time) []*sComment {
 	newComments := rs.preTreatComments(comments, startTime)
 
-	m := map[string]bool{}
+	done := map[string]bool{}
 	n := len(newComments)
 	validComments := make([]*sComment, 0, n)
 	for i := n - 1; i >= 0; i-- {
 		c := &newComments[i]
-		if m[c.author] {
+		if done[c.author] {
 			continue
 		}
 		if cmd := rs.getCommands(c); cmd != "" {
 			c.comment = cmd
 			validComments = append(validComments, c)
-			m[c.author] = true
+			done[c.author] = true
 		}
 	}
 
@@ -113,18 +115,6 @@ func (rs reviewState) getCommands(c *sComment) string {
 		return ""
 	}
 
-	negatives := map[string]bool{
-		cmdLBTM:   false,
-		cmdReject: false,
-	}
-	positives := map[string]bool{
-		cmdAPPROVE: false,
-		cmdLGTM:    false,
-	}
-
-	lastCmd := ""
-	negativeNum := 0
-	positiveNum := 0
 	check := func(cmd string) bool {
 		return canApplyCmd(
 			cmd, rs.prAuthor == c.author,
@@ -132,26 +122,24 @@ func (rs reviewState) getCommands(c *sComment) string {
 		)
 	}
 
+	lastCmd := ""
+	negatives := map[string]bool{}
+	positives := map[string]bool{}
 	for _, cmd := range cmds {
 		if !check(cmd) {
 			continue
 		}
 
 		lastCmd = cmd
-		if v, ok := negatives[cmd]; ok {
-			if !v {
-				negatives[cmd] = true
-				negativeNum += 1
-			}
-		} else {
-			if !positives[cmd] {
-				positives[cmd] = true
-				positiveNum += 1
-			}
+		if negativeCmds.Has(cmd) {
+			negatives[cmd] = true
+		}
+		if positiveCmds.Has(cmd) {
+			positives[cmd] = true
 		}
 	}
 
-	if negativeNum == 0 && positiveNum == len(positives) {
+	if len(negatives) == 0 && len(positiveCmds) == len(positives) {
 		return cmdAPPROVE
 	}
 	return lastCmd
@@ -164,25 +152,10 @@ func (rs reviewState) applyComments(comments []*sComment) string {
 		records[dir] = &v
 	}
 
-	m := map[string]string{
-		cmdAPPROVE: cmdLGTM,
-		cmdReject:  cmdLBTM,
-	}
-
 	for _, c := range comments {
 		cmd := c.comment
 		if cmdBelongsToApprover.Has(cmd) {
-			dirs := rs.approverDirMap[c.author]
-			cmd1 := m[cmd]
-			for k := range records {
-				if dirs.Has(k) {
-					records[k].update(cmd)
-				} else {
-					records[k].update(cmd1)
-				}
-			}
-		} else {
-			for k := range records {
+			for k := range rs.approverDirMap[c.author] {
 				records[k].update(cmd)
 			}
 		}
@@ -191,38 +164,37 @@ func (rs reviewState) applyComments(comments []*sComment) string {
 	r := map[string]int{
 		labelRequestChange: 0,
 		labelApproved:      0,
-		labelLGTM:          0,
 	}
-
-	approveNum := rs.cfg.NumberOfApprovers
 	for _, v := range records {
-		r[v.inferLabel(approveNum)] += 1
+		l := v.inferLabel(rs.cfg.NumberOfApprovers)
+		if l != "" {
+			r[l] += 1
+		}
 	}
 
 	if r[labelRequestChange] > 0 {
 		return labelRequestChange
 	}
 
-	if r[labelLGTM] > 0 {
-		return labelLGTM
+	if r[labelApproved] == len(records) {
+		return labelApproved
 	}
 
-	return labelApproved
+	// At this point, the pr has not been approved, the label of pr
+	// can be determind by the last command of reviewer.
+	if positiveCmds.Has(comments[0].comment) {
+		return labelLGTM
+	}
+	return labelRequestChange
 }
 
 type record struct {
-	cmdLGTMNum    int
-	cmdLBTMNum    int
 	cmdAPPROVENum int
 	cmdRejectNum  int
 }
 
 func (r *record) update(cmd string) {
 	switch cmd {
-	case cmdLBTM:
-		r.cmdLBTMNum += 1
-	case cmdLGTM:
-		r.cmdLGTMNum += 1
 	case cmdAPPROVE:
 		r.cmdAPPROVENum += 1
 	case cmdReject:
@@ -239,8 +211,5 @@ func (r *record) inferLabel(approveNum int) string {
 		return labelApproved
 	}
 
-	if r.cmdAPPROVENum > 0 || (r.cmdLGTMNum-r.cmdLBTMNum) > 0 {
-		return labelLGTM
-	}
-	return labelRequestChange
+	return ""
 }
