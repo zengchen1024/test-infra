@@ -2,6 +2,7 @@ package reviewtrigger
 
 import (
 	"fmt"
+	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
@@ -147,22 +148,40 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 }
 
 func (rt *trigger) removeInvalidLabels(e *sdk.PullRequestEvent, canReview bool) error {
+	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
+	cfg, err := rt.orgRepoConfig(org, repo)
+	if err != nil {
+		return err
+	}
+
 	rml := []string{labelApproved, labelRequestChange, labelLGTM}
+	if cfg.EnableLabelForCI {
+		rml = append(rml, cfg.labelsForCI()...)
+	}
 	if !canReview {
 		rml = append(rml, labelCanReview)
 	}
 
-	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 	number := int(e.PullRequest.Number)
 	m := gitee.GetLabelFromEvent(e.PullRequest.Labels)
 
+	rmls := make([]string, 0, len(rml))
 	errs := newErrors()
 	for _, l := range rml {
 		if m[l] {
 			if err := rt.client.RemovePRLabel(org, repo, number, l); err != nil {
 				errs.add(fmt.Sprintf("remove label:%s, err:%v", l, err))
 			}
+			rmls = append(rmls, l)
 		}
+	}
+	if len(rmls) > 0 {
+		rt.client.CreatePRComment(
+			org, repo, number, fmt.Sprintf(
+				"New changes are detected. Remove the following labels: %s.",
+				strings.Join(rmls, ", "),
+			),
+		)
 	}
 
 	l := labelCanReview

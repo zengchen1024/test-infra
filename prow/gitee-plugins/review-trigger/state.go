@@ -59,16 +59,19 @@ func (rs reviewState) applyLabel(label string, isCIPassed bool, reviewComments [
 		errs.addError(err)
 	}
 
-	tips := findApproveTips(allComments, rs.botName)
-	if tips != nil {
-		if tips.Body != desc {
-			if err := rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc); err != nil {
+	if desc != "" {
+		tips := findApproveTips(allComments, rs.botName)
+		if tips != nil {
+			if tips.Body != desc {
+				err := rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc)
+				if err != nil {
+					errs.addError(err)
+				}
+			}
+		} else {
+			if err := rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc); err != nil {
 				errs.addError(err)
 			}
-		}
-	} else {
-		if err := rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc); err != nil {
-			errs.addError(err)
 		}
 	}
 	return errs.err()
@@ -95,6 +98,9 @@ func (rs reviewState) applyApprovedLabel(cls map[string]bool) error {
 
 	toRemove := []string{labelRequestChange, labelCanReview}
 	for _, l := range toRemove {
+		if !cls[l] {
+			continue
+		}
 		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
 			errs.addError(err)
 		}
@@ -110,10 +116,20 @@ func (rs reviewState) applyLGTMLabel(cls map[string]bool) error {
 	if !cls[l] {
 		if err := rs.c.AddPRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
 			errs.addError(err)
+		} else {
+			err := rs.c.CreatePRComment(
+				rs.org, rs.repo, rs.prNumber, "lgtm label has been added.",
+			)
+			if err != nil {
+				errs.addError(err)
+			}
 		}
 	}
 
 	for _, l := range []string{labelApproved, labelRequestChange, labelCanReview} {
+		if !cls[l] {
+			continue
+		}
 		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
 			errs.addError(err)
 		}
@@ -133,6 +149,9 @@ func (rs reviewState) applyRequestChangeLabel(cls map[string]bool) error {
 	}
 
 	for _, l := range []string{labelApproved, labelLGTM, labelCanReview} {
+		if !cls[l] {
+			continue
+		}
 		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
 			errs.addError(err)
 		}

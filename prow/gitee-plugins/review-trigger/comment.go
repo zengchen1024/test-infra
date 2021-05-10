@@ -72,31 +72,27 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) erro
 	}
 
 	commenter := ne.GetCommenter()
-	if !rs.reviewers.Has(commenter) {
-		return nil
-	}
-
 	notApprover := !rs.isApprover(commenter)
-	invalid := false
 	for _, cmd := range cmds {
 		if cmdBelongsToApprover.Has(cmd) && notApprover {
-			invalid = true
+			rt.client.CreatePRComment(
+				rs.org, rs.repo, rs.prNumber,
+				op.FormatResponseRaw(
+					ne.GetComment(), ne.Comment.HtmlUrl, commenter,
+					fmt.Sprintf(
+						"These commands such as %s are restricted to approvers in OWNERS files.",
+						strings.Join(cmdBelongsToApprover.List(), ", "),
+					),
+				),
+			)
+
 			break
 		}
 	}
-	if invalid {
-		rt.client.CreatePRComment(
-			rs.org, rs.repo, rs.prNumber,
-			op.FormatResponseRaw(
-				ne.GetComment(), ne.Comment.HtmlUrl, commenter,
-				fmt.Sprintf(
-					"These commands such as %s are restricted to approvers in OWNERS files.",
-					strings.Join(cmdBelongsToApprover.List(), ", "),
-				),
-			),
-		)
-	}
 
+	if !rs.reviewers.Has(commenter) {
+		return nil
+	}
 	return rs.handle(false)
 }
 

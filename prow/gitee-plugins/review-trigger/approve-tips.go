@@ -22,7 +22,7 @@ func createTips(reviewComments []*sComment) string {
 	}
 
 	return fmt.Sprintf(
-		"%s **NOT APPROVED**\n\n%sIt needs approval from approvers to be merged.",
+		"%s **NOT APPROVED**\n\n%sIt still needs approval from approvers to be merged.",
 		notificationTitle, s,
 	)
 
