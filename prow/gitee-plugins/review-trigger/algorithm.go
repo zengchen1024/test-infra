@@ -45,7 +45,7 @@ func parseCommandFromComment(comment string) []string {
 func canApplyCmd(cmd string, isPRAuthor, isApprover, allowSelfApprove bool) bool {
 	switch cmd {
 	case cmdReject:
-		return (isPRAuthor || isApprover)
+		return isApprover && !isPRAuthor
 	case cmdLGTM:
 		return !isPRAuthor
 	case cmdAPPROVE:

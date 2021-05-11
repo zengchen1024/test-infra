@@ -70,7 +70,7 @@ func (rt *trigger) HelpProvider(_ []prowConfig.OrgRepo) (*pluginhelp.PluginHelp,
 		Usage:       "/reject",
 		Description: "The code can't be merged. It will add 'request-change' label if approver comment /reject",
 		Featured:    true,
-		WhoCanUse:   "The approver or the author of pull-request",
+		WhoCanUse:   "The approvers except the author of pull-request",
 		Examples:    []string{"/reject"},
 	})
 
