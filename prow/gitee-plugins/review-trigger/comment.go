@@ -95,7 +95,7 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) erro
 		}
 	}
 
-	if !rs.reviewers.Has(commenter) {
+	if !rs.isReviewer(commenter) {
 		return nil
 	}
 	return rs.handle(false)

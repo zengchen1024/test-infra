@@ -3,6 +3,8 @@ package reviewtrigger
 import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"k8s.io/test-infra/prow/github"
 )
 
 type reviewState struct {
@@ -32,6 +34,9 @@ func (rs reviewState) handle(isCIPassed bool) error {
 	}
 
 	validComments := rs.filterComments(comments, t)
+	if len(validComments) == 0 {
+		return nil
+	}
 
 	label := rs.applyComments(validComments)
 
@@ -162,6 +167,19 @@ func (rs reviewState) applyRequestChangeLabel(cls map[string]bool) error {
 }
 
 func (rs reviewState) isApprover(author string) bool {
-	_, b := rs.approverDirMap[author]
+	_, b := rs.approverDirMap[github.NormLogin(author)]
 	return b
+}
+
+func (rs reviewState) dirsOfApprover(author string) sets.String {
+	v, b := rs.approverDirMap[github.NormLogin(author)]
+	if b {
+		return v
+	}
+
+	return sets.String{}
+}
+
+func (rs reviewState) isReviewer(author string) bool {
+	return rs.reviewers.Has(github.NormLogin(author))
 }

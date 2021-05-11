@@ -65,7 +65,7 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 	for i := range comments {
 		c := &comments[i]
 
-		if c.User == nil || c.User.Login == rs.botName || !rs.reviewers.Has(c.User.Login) {
+		if c.User == nil || c.User.Login == rs.botName || !rs.isReviewer(c.User.Login) {
 			continue
 		}
 
@@ -155,7 +155,7 @@ func (rs reviewState) applyComments(comments []*sComment) string {
 	for _, c := range comments {
 		cmd := c.comment
 		if cmdBelongsToApprover.Has(cmd) {
-			for k := range rs.approverDirMap[c.author] {
+			for k := range rs.dirsOfApprover(c.author) {
 				records[k].update(cmd)
 			}
 		}
