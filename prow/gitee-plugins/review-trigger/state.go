@@ -98,7 +98,7 @@ func (rs reviewState) applyApprovedLabel(cls map[string]bool) error {
 
 	toRemove := []string{labelRequestChange, labelCanReview}
 	for _, l := range toRemove {
-		if !cls[l] {
+		if cls[l] {
 			err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l)
 			errs.addError(err)
 		}
