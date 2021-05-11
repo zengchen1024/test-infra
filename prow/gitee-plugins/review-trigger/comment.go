@@ -3,6 +3,7 @@ package reviewtrigger
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -83,12 +84,12 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) erro
 		if !check(cmd) {
 			cfg, _ := rt.pluginConfig()
 			s := fmt.Sprintf(
-				"You can't use command of %s. Please see the [command usage](%s) to get detail",
-				cmd, cfg.Trigger.CommandsLink,
+				"You can't use command of `/%s`. Please see the [*command usage*](%s) to get detail",
+				strings.ToLower(cmd), cfg.Trigger.CommandsLink,
 			)
 			rt.client.CreatePRComment(
 				rs.org, rs.repo, rs.prNumber,
-				op.FormatResponseRaw(ne.GetComment(), ne.Comment.HtmlUrl, commenter, s),
+				op.FormatResponseRaw1(ne.GetComment(), ne.Comment.HtmlUrl, commenter, s),
 			)
 
 			break
