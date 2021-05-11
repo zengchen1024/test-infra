@@ -61,23 +61,18 @@ func (rs reviewState) applyLabel(label string, isCIPassed bool, reviewComments [
 		desc = updateTips(label, reviewComments)
 	}
 	errs := newErrors()
-	if err != nil {
-		errs.addError(err)
-	}
+	errs.addError(err)
 
 	if desc != "" {
 		tips := findApproveTips(allComments, rs.botName)
 		if tips != nil {
 			if tips.Body != desc {
 				err := rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc)
-				if err != nil {
-					errs.addError(err)
-				}
-			}
-		} else {
-			if err := rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc); err != nil {
 				errs.addError(err)
 			}
+		} else {
+			err := rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
+			errs.addError(err)
 		}
 	}
 	return errs.err()
@@ -97,17 +92,14 @@ func (rs reviewState) applyApprovedLabel(cls map[string]bool) error {
 	errs := newErrors()
 
 	if len(toAdd) > 0 {
-		if err := rs.c.AddMultiPRLabel(rs.org, rs.repo, rs.prNumber, toAdd); err != nil {
-			errs.addError(err)
-		}
+		err := rs.c.AddMultiPRLabel(rs.org, rs.repo, rs.prNumber, toAdd)
+		errs.addError(err)
 	}
 
 	toRemove := []string{labelRequestChange, labelCanReview}
 	for _, l := range toRemove {
 		if !cls[l] {
-			continue
-		}
-		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
+			err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l)
 			errs.addError(err)
 		}
 	}
@@ -126,17 +118,13 @@ func (rs reviewState) applyLGTMLabel(cls map[string]bool) error {
 			err := rs.c.CreatePRComment(
 				rs.org, rs.repo, rs.prNumber, "lgtm label has been added.",
 			)
-			if err != nil {
-				errs.addError(err)
-			}
+			errs.addError(err)
 		}
 	}
 
 	for _, l := range []string{labelApproved, labelRequestChange, labelCanReview} {
-		if !cls[l] {
-			continue
-		}
-		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
+		if cls[l] {
+			err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l)
 			errs.addError(err)
 		}
 	}
@@ -149,16 +137,13 @@ func (rs reviewState) applyRequestChangeLabel(cls map[string]bool) error {
 
 	l := labelRequestChange
 	if !cls[l] {
-		if err := rs.c.AddPRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
-			errs.addError(err)
-		}
+		err := rs.c.AddPRLabel(rs.org, rs.repo, rs.prNumber, l)
+		errs.addError(err)
 	}
 
 	for _, l := range []string{labelApproved, labelLGTM, labelCanReview} {
-		if !cls[l] {
-			continue
-		}
-		if err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
+		if cls[l] {
+			err := rs.c.RemovePRLabel(rs.org, rs.repo, rs.prNumber, l)
 			errs.addError(err)
 		}
 	}

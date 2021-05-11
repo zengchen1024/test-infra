@@ -102,11 +102,8 @@ func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent) error {
 	}
 
 	if cfg.EnableLabelForCI {
-		l := cfg.statusToLabel(status)
-
-		if err := updatePRCILabel(ne, l, cfg, rt.client); err != nil {
-			errs.addError(err)
-		}
+		err := updatePRCILabel(ne, cfg.statusToLabel(status), cfg, rt.client)
+		errs.addError(err)
 	}
 
 	return errs.err()
@@ -123,14 +120,13 @@ func updatePRCILabel(ne gitee.PRNoteEvent, label string, cfg *pluginConfig, clie
 	errs := newErrors()
 	for _, item := range cfg.labelsForCI() {
 		if m[item] {
-			if err := client.RemovePRLabel(org, repo, prNumber, item); err != nil {
-				errs.addError(err)
-			}
+			err := client.RemovePRLabel(org, repo, prNumber, item)
+			errs.addError(err)
 		}
 	}
 
-	if err := client.AddPRLabel(org, repo, prNumber, label); err != nil {
-		errs.addError(err)
-	}
+	err := client.AddPRLabel(org, repo, prNumber, label)
+	errs.addError(err)
+
 	return errs.err()
 }

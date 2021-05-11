@@ -122,17 +122,23 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 	action := plugins.ConvertPullRequestAction(e)
 	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 	prNumber := int(e.PullRequest.Number)
+	errs := newErrors()
+
 	switch action {
 	case github.PullRequestActionOpened:
-		err := rt.client.AddPRLabel(org, repo, prNumber, labelCanReview)
+		if err := rt.client.AddPRLabel(org, repo, prNumber, labelCanReview); err != nil {
+			errs.add(fmt.Sprintf("add label when pr is open, err:%s", err.Error()))
+		}
+
+		if err := rt.welcome(org, repo, prNumber); err != nil {
+			errs.add(fmt.Sprintf("add welcome comment, err:%s", err.Error()))
+		}
 		// suggest reviewer
 
 		// no need to update local repo everytime when a pr is open.
 		// repoowner will update it necessarily when suggesting reviewers.
-		return err
 
 	case github.PullRequestActionSynchronize:
-		errs := newErrors()
 		if err := rt.removeInvalidLabels(e, true); err != nil {
 			errs.add(fmt.Sprintf("remove label when source code changed, err:%s", err.Error()))
 		}
@@ -141,10 +147,25 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 		if err := rt.deleteTips(org, repo, prNumber); err != nil {
 			errs.add(fmt.Sprintf("delete tips, err:%s", err.Error()))
 		}
-		return errs.err()
 
 	}
-	return nil
+	return errs.err()
+
+}
+
+func (rt *trigger) welcome(org, repo string, prNumber int) error {
+	cfg, err := rt.pluginConfig()
+	if err != nil {
+		return err
+	}
+
+	return rt.client.CreatePRComment(
+		org, repo, prNumber,
+		fmt.Sprintf(
+			"Thank your for your pull-request. The full list of commands accepted by me can be found at [**here**](%s)",
+			cfg.Trigger.CommandsLink,
+		),
+	)
 }
 
 func (rt *trigger) removeInvalidLabels(e *sdk.PullRequestEvent, canReview bool) error {

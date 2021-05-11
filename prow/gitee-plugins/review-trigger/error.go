@@ -20,7 +20,9 @@ func (e *multiError) add(s string) {
 }
 
 func (e *multiError) addError(err error) {
-	e.es = append(e.es, err.Error())
+	if err != nil {
+		e.add(err.Error())
+	}
 }
 
 func (e *multiError) err() error {
