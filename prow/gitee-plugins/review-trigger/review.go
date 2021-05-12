@@ -162,8 +162,8 @@ func (rt *trigger) welcome(org, repo string, prNumber int) error {
 	return rt.client.CreatePRComment(
 		org, repo, prNumber,
 		fmt.Sprintf(
-			"Thank your for your pull-request. The full list of commands accepted by me can be found at [**here**](%s)",
-			cfg.Trigger.CommandsLink,
+			"Thank your for your pull-request.\n\nThe full list of commands accepted by me can be found at [**here**](%s).\nYou can get details about the review process of pull-request at [**here**](%s)",
+			cfg.Trigger.CommandsLink, "https://github.com/opensourceways/test-infra/blob/sync-5-22/prow/gitee-plugins/review-trigger/review.md",
 		),
 	)
 }
