@@ -18,7 +18,7 @@ type Client interface {
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
-	ListPrIssues(org, repo string, number int32) ([] sdk.Issue, error)
+	ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error)
 	DeletePRComment(org, repo string, ID int) error
 	CreatePRComment(org, repo string, number int, comment string) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
@@ -39,6 +39,7 @@ type Client interface {
 	IsMember(org, login string) (bool, error)
 	GetGiteePullRequest(org, repo string, number int) (sdk.PullRequest, error)
 	GetSingleCommit(org, repo, SHA string) (github.SingleCommit, error)
+	GetPRCommit(org, repo, SHA string) (sdk.RepoCommit, error)
 	MergePR(owner, repo string, number int, opt sdk.PullRequestMergePutParam) error
 
 	GetRepos(org string) ([]sdk.Project, error)
