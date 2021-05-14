@@ -91,55 +91,8 @@ func (cl *cla) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 
 func (cl *cla) handlePullRequestComment(e gitee.PRNoteEvent, log *logrus.Entry) error {
 	org, repo := e.GetOrgRep()
-	cfg, err := cl.orgRepoConfig(org, repo)
-	if err != nil {
-		return err
-	}
-
-	prNumber := e.GetPRNumber()
-	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
-	if err != nil {
-		return err
-	}
-
-	hasCLAYes := false
-	hasCLANo := false
-	pr := e.PullRequest
-	for _, label := range pr.Labels {
-		if !hasCLAYes && label.Name == cfg.CLALabelYes {
-			hasCLAYes = true
-		}
-		if !hasCLANo && label.Name == cfg.CLALabelNo {
-			hasCLANo = true
-		}
-	}
-
-	if signed {
-		if hasCLANo {
-			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
-				log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelNo)
-			}
-		}
-
-		if !hasCLAYes {
-			if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
-				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
-			}
-		}
-		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(pr.User.Login))
-	}
-	if hasCLAYes {
-		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
-			log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelYes)
-		}
-	}
-
-	if !hasCLANo {
-		if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
-			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
-		}
-	}
-	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
+	l := gitee.GetLabelFromEvent(e.PullRequest.Labels)
+	return cl.handle(org, repo, e.GetPRAuthor(), e.GetPRNumber(), l, log)
 }
 
 func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
@@ -159,26 +112,49 @@ func (cl *cla) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry
 	}
 
 	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
+	pr := e.PullRequest
+	l := gitee.GetLabelFromEvent(e.PullRequest.Labels)
+	return cl.handle(org, repo, pr.User.Login, int(pr.Number), l, log)
+}
+
+func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map[string]bool, log *logrus.Entry) error {
 	cfg, err := cl.orgRepoConfig(org, repo)
 	if err != nil {
 		return err
 	}
 
-	pr := e.PullRequest
-	prNumber := int(pr.Number)
 	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
 	if err != nil {
 		return err
 	}
+
+	hasCLAYes := currentLabes[cfg.CLALabelYes]
+	hasCLANo := currentLabes[cfg.CLALabelNo]
+
 	if signed {
-		if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
-			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
+		if hasCLANo {
+			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
+				log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelNo)
+			}
 		}
-		return nil
+
+		if !hasCLAYes {
+			if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
+				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
+			}
+		}
+		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(prAuthor))
+	}
+	if hasCLAYes {
+		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
+			log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelYes)
+		}
 	}
 
-	if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
-		log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
+	if !hasCLANo {
+		if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
+			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
+		}
 	}
 	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
 }
