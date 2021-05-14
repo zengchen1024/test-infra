@@ -196,7 +196,7 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		if v.Commit == nil || v.Commit.Author == nil {
 			continue
 		}
-		email := v.Commit.Author.Email
+		email := plugins.NormalEmail(v.Commit.Author.Email)
 		if _, ok := cos[email]; !ok {
 			cos[email] = v
 		}

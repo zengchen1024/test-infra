@@ -2,12 +2,17 @@ package plugins
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
+)
+
+var (
+	emailRe = regexp.MustCompile(`[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,6}`)
 )
 
 func NoteEventToCommentEvent(e *sdk.NoteEvent) github.GenericCommentEvent {
@@ -225,4 +230,12 @@ func checkRepository(rep *sdk.ProjectHook, eventType string) error {
 
 func fmtCheckError(eventType, field string) error {
 	return fmt.Errorf("%s is illegal: the %s field is empty", eventType, field)
+}
+
+func NormalEmail(email string) string {
+	v := emailRe.FindStringSubmatch(email)
+	if len(v) > 0 {
+		return v[0]
+	}
+	return email
 }
