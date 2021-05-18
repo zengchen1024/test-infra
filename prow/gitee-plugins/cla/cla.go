@@ -140,8 +140,9 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 			if err := cl.ghc.AddLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 				log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelYes)
 			}
+			return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(prAuthor))
 		}
-		return cl.ghc.CreateComment(org, repo, prNumber, alreadySigned(prAuthor))
+		return nil
 	}
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
