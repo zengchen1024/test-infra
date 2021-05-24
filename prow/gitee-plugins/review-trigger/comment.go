@@ -17,18 +17,15 @@ func (rt *trigger) inferApproversReviewers(org, repo, branch string, prNumber in
 		return nil, nil, err
 	}
 
-	filenames, err := rt.client.GetPullRequestChanges(org, repo, prNumber)
+	filenames, err := rt.client.getPullRequestChanges(org, repo, prNumber)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	m := map[string]sets.String{}
-	for i := range filenames {
-		filename := filenames[i].Filename
+	for _, filename := range filenames {
 		dir := filepath.Dir(filename)
-		if _, ok := m[dir]; !ok {
-			m[dir] = ro.Approvers(filename)
-		}
+		m[dir] = ro.Approvers(filename)
 	}
 
 	return m, ro.AllReviewers(), nil

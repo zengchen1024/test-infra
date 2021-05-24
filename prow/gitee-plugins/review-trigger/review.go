@@ -133,7 +133,10 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 		if err := rt.welcome(org, repo, prNumber); err != nil {
 			errs.add(fmt.Sprintf("add welcome comment, err:%s", err.Error()))
 		}
-		// suggest reviewer
+
+		if err := rt.suggestReviewers(e, log); err != nil {
+			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
+		}
 
 		// no need to update local repo everytime when a pr is open.
 		// repoowner will update it necessarily when suggesting reviewers.
@@ -142,7 +145,10 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 		if err := rt.removeInvalidLabels(e, true); err != nil {
 			errs.add(fmt.Sprintf("remove label when source code changed, err:%s", err.Error()))
 		}
-		// suggest reviewer
+
+		if err := rt.suggestReviewers(e, log); err != nil {
+			errs.add(fmt.Sprintf("suggest reviewers, err: %s", err.Error()))
+		}
 
 		if err := rt.deleteTips(org, repo, prNumber); err != nil {
 			errs.add(fmt.Sprintf("delete tips, err:%s", err.Error()))
@@ -150,7 +156,6 @@ func (rt *trigger) handlePREvent(e *sdk.PullRequestEvent, log *logrus.Entry) err
 
 	}
 	return errs.err()
-
 }
 
 func (rt *trigger) welcome(org, repo string, prNumber int) error {
@@ -242,4 +247,41 @@ func (rt *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	}
 
 	return rt.handleCIStatusComment(ne)
+}
+
+func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) error {
+	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
+	cfg, err := rt.orgRepoConfig(org, repo)
+	if err != nil {
+		return err
+	}
+
+	sg := reviewerHelper{
+		c:   rt.client,
+		roc: rt.oc,
+		log: log,
+		cfg: cfg.Reviewers,
+	}
+	pr := e.PullRequest
+	prNumber := int(pr.Number)
+	prAuthor := pr.User.Login
+	reviewers, err := sg.suggestReviewers(org, repo, pr.Base.Ref, prAuthor, prNumber)
+	if err != nil {
+		return err
+	}
+	if len(reviewers) == 0 {
+		return nil
+	}
+
+	rs := make([]string, 0, len(reviewers))
+	for _, item := range reviewers {
+		rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
+	}
+
+	return rt.client.CreatePRComment(
+		org, repo, prNumber, fmt.Sprintf(
+			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",
+			prAuthor, strings.Join(rs, ", "), reviewers[0],
+		),
+	)
 }
