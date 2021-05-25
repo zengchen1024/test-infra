@@ -24,8 +24,7 @@ func (rt *trigger) inferApproversReviewers(org, repo, branch string, prNumber in
 
 	m := map[string]sets.String{}
 	for _, filename := range filenames {
-		dir := filepath.Dir(filename)
-		m[dir] = ro.Approvers(filename)
+		m[filepath.Dir(filename)] = ro.Approvers(filename)
 	}
 
 	return m, ro.AllReviewers(), nil
