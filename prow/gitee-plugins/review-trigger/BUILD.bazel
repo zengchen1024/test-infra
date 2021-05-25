@@ -11,6 +11,7 @@ go_library(
         "config.go",
         "error.go",
         "review.go",
+        "reviewer-helper.go",
         "state.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins/review-trigger",

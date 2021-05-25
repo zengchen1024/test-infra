@@ -1,9 +1,11 @@
 package reviewtrigger
 
 import (
+	"path/filepath"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
+
 	"k8s.io/test-infra/prow/github"
 )
 
@@ -44,4 +46,23 @@ func (c ghclient) getPRCurrentLabels(org, repo string, number int) (map[string]b
 		m[labels[i].Name] = true
 	}
 	return m, nil
+}
+
+func (c ghclient) getPullRequestChanges(org, repo string, number int) ([]string, error) {
+	filenames, err := c.GetPullRequestChanges(org, repo, number)
+	if err != nil {
+		return nil, err
+	}
+
+	m := map[string]bool{}
+	r := make([]string, 0, len(filenames))
+	for i := range filenames {
+		filename := filenames[i].Filename
+		dir := filepath.Dir(filename)
+		if !m[dir] {
+			m[dir] = true
+			r = append(r, filename)
+		}
+	}
+	return r, nil
 }

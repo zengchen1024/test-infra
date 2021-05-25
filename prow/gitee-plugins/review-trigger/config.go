@@ -63,6 +63,9 @@ func (c *configuration) SetDefault() {
 		}
 
 		item.runningStatusOfJob = "running"
+		if item.Reviewers.ReviewerCount == 0 {
+			item.Reviewers.ReviewerCount = 2
+		}
 	}
 }
 
@@ -92,6 +95,17 @@ func (c *configuration) TriggerFor(org, repo string) *pluginConfig {
 	}
 
 	return nil
+}
+
+type reviewerConfig struct {
+	// ReviewerCount is the minimum number of reviewers to request
+	// reviews from. Defaults to requesting reviews from 2 reviewers
+	ReviewerCount int `json:"request_count,omitempty"`
+	// ExcludeApprovers controls whether approvers are considered to be
+	// reviewers. By default, approvers are considered as reviewers if
+	// insufficient reviewers are available. If ExcludeApprovers is true,
+	// approvers will never be considered as reviewers.
+	ExcludeApprovers bool `json:"exclude_approvers,omitempty"`
 }
 
 type pluginConfig struct {
@@ -143,6 +157,8 @@ type pluginConfig struct {
 	FailureStatusOfJob string `json:"failure_status_of_job" required:"true"`
 
 	runningStatusOfJob string
+
+	Reviewers reviewerConfig `json:"reviewers"`
 }
 
 func (p pluginConfig) labelsForCI() []string {
