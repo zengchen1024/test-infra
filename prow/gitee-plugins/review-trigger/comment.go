@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/test-infra/prow/gitee"
+	"k8s.io/test-infra/prow/github"
 	op "k8s.io/test-infra/prow/plugins"
 )
 
@@ -37,7 +38,7 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent, log *logrus.Entry) (*rev
 	v := ne.PullRequest.Assignees
 	as := make([]string, 0, len(v))
 	for i := range v {
-		as = append(as, v[i].Login)
+		as = append(as, github.NormLogin(v[i].Login))
 	}
 
 	s := reviewState{
@@ -68,7 +69,7 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, log *logrus.Entry) 
 		return err
 	}
 
-	commenter := ne.GetCommenter()
+	commenter := github.NormLogin(ne.GetCommenter())
 	c := sComment{
 		comment: ne.GetComment(),
 		author:  commenter,

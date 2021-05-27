@@ -8,6 +8,7 @@ import (
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/test-infra/prow/github"
 )
 
 const (
@@ -75,7 +76,7 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 		}
 
 		r = append(r, sComment{
-			author:  c.User.Login,
+			author:  github.NormLogin(c.User.Login),
 			t:       ut,
 			comment: c.Body,
 		})

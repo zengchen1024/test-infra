@@ -162,12 +162,12 @@ func (rs reviewState) applyRequestChangeLabel(cls map[string]bool) error {
 }
 
 func (rs reviewState) isApprover(author string) bool {
-	_, b := rs.approverDirMap[github.NormLogin(author)]
+	_, b := rs.approverDirMap[author]
 	return b
 }
 
 func (rs reviewState) dirsOfApprover(author string) sets.String {
-	v, b := rs.approverDirMap[github.NormLogin(author)]
+	v, b := rs.approverDirMap[author]
 	if b {
 		return v
 	}
@@ -176,7 +176,7 @@ func (rs reviewState) dirsOfApprover(author string) sets.String {
 }
 
 func (rs reviewState) isReviewer(author string) bool {
-	return rs.reviewers.Has(github.NormLogin(author))
+	return rs.reviewers.Has(author)
 }
 
 func (rs reviewState) suggestApprover(currentApprovers []string) []string {
