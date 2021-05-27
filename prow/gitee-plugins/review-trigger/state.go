@@ -2,9 +2,12 @@ package reviewtrigger
 
 import (
 	sdk "gitee.com/openeuler/go-gitee/gitee"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"k8s.io/test-infra/prow/gitee-plugins/review-trigger/approvers"
 	"k8s.io/test-infra/prow/github"
+	"k8s.io/test-infra/prow/repoowners"
 )
 
 type reviewState struct {
@@ -14,15 +17,19 @@ type reviewState struct {
 	botName        string
 	prAuthor       string
 	prNumber       int
+	filenames      []string
 	currentLabels  map[string]bool
+	assignees      []string
 	c              ghclient
 	cfg            *pluginConfig
 	dirApproverMap map[string]sets.String
 	approverDirMap map[string]sets.String
 	reviewers      sets.String
+	owner          repoowners.RepoOwner
+	log            *logrus.Entry
 }
 
-func (rs reviewState) handle(isCIPassed bool) error {
+func (rs reviewState) handle(isCIPassed bool, latestComment string) error {
 	t, err := rs.c.getPRCodeUpdateTime(rs.org, rs.repo, rs.headSHA)
 	if err != nil {
 		return err
@@ -40,31 +47,34 @@ func (rs reviewState) handle(isCIPassed bool) error {
 
 	label := rs.applyComments(validComments)
 
-	return rs.applyLabel(label, isCIPassed, validComments, comments)
+	return rs.applyLabel(label, validComments, comments, isCIPassed, latestComment)
 }
 
-func (rs reviewState) applyLabel(label string, isCIPassed bool, reviewComments []*sComment, allComments []sdk.PullRequestComments) error {
+func (rs reviewState) applyLabel(label string, reviewComments []*sComment, allComments []sdk.PullRequestComments, isCIPassed bool, latestComment string) error {
 	cls := rs.currentLabels
+	tips := findApproveTips(allComments, rs.botName)
+
+	approvers, rejecters := statApprover(reviewComments)
+
 	var err error
 	desc := ""
 	switch label {
 	case labelRequestChange:
 		err = rs.applyRequestChangeLabel(cls)
-		desc = updateTips(label, reviewComments)
+		desc = updateTips(label, approvers, rejecters)
 	case labelLGTM:
 		err = rs.applyLGTMLabel(cls)
-		if isCIPassed || cls[rs.cfg.LabelForCIPassed] {
-			desc = createTips(reviewComments)
+		if isCIPassed || (cls[rs.cfg.LabelForCIPassed] && (tips == nil || latestComment == cmdAPPROVE)) {
+			desc = createTips(approvers, rs.suggestApprover(approvers))
 		}
 	case labelApproved:
 		err = rs.applyApprovedLabel(cls)
-		desc = updateTips(label, reviewComments)
+		desc = updateTips(label, approvers, rejecters)
 	}
 	errs := newErrors()
 	errs.addError(err)
 
 	if desc != "" {
-		tips := findApproveTips(allComments, rs.botName)
 		if tips != nil {
 			if tips.Body != desc {
 				err := rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc)
@@ -167,4 +177,11 @@ func (rs reviewState) dirsOfApprover(author string) sets.String {
 
 func (rs reviewState) isReviewer(author string) bool {
 	return rs.reviewers.Has(github.NormLogin(author))
+}
+
+func (rs reviewState) suggestApprover(currentApprovers []string) []string {
+	return approvers.SuggestApprovers(
+		currentApprovers, rs.assignees, rs.filenames, rs.prNumber,
+		rs.cfg.NumberOfApprovers, rs.owner, rs.log,
+	)
 }

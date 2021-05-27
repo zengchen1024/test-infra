@@ -2,47 +2,42 @@ package reviewtrigger
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/test-infra/prow/gitee"
 	op "k8s.io/test-infra/prow/plugins"
 )
 
-func (rt *trigger) inferApproversReviewers(org, repo, branch string, prNumber int) (map[string]sets.String, sets.String, error) {
-	ro, err := rt.oc.LoadRepoOwners(org, repo, branch)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	filenames, err := rt.client.getPullRequestChanges(org, repo, prNumber)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	m := map[string]sets.String{}
-	for _, filename := range filenames {
-		m[filepath.Dir(filename)] = ro.Approvers(filename)
-	}
-
-	return m, ro.AllReviewers(), nil
-}
-
-func (rt *trigger) newReviewState(ne gitee.PRNoteEvent) (reviewState, error) {
+func (rt *trigger) newReviewState(ne gitee.PRNoteEvent, log *logrus.Entry) (*reviewState, error) {
 	org, repo := ne.GetOrgRep()
 
-	dirApproverMap, reviewers, err := rt.inferApproversReviewers(
-		org, repo, ne.PullRequest.Base.Ref, ne.GetPRNumber(),
-	)
+	ro, err := rt.oc.LoadRepoOwners(org, repo, ne.PullRequest.Base.Ref)
 	if err != nil {
-		return reviewState{}, err
+		return nil, err
+	}
+
+	filenames, err := rt.client.getPullRequestChanges(org, repo, ne.GetPRNumber())
+	if err != nil {
+		return nil, err
+	}
+
+	dirApproverMap := map[string]sets.String{}
+	for _, filename := range filenames {
+		dirApproverMap[filename] = ro.Approvers(filename)
 	}
 
 	cfg, err := rt.orgRepoConfig(org, repo)
 	if err != nil {
-		return reviewState{}, err
+		return nil, err
+	}
+
+	v := ne.PullRequest.Assignees
+	as := make([]string, 0, len(v))
+	for i := range v {
+		as = append(as, v[i].Login)
 	}
 
 	s := reviewState{
@@ -52,50 +47,49 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent) (reviewState, error) {
 		botName:        rt.botName,
 		prAuthor:       ne.PullRequest.User.Login,
 		prNumber:       ne.GetPRNumber(),
+		filenames:      filenames,
 		currentLabels:  gitee.GetLabelFromEvent(ne.PullRequest.Labels),
+		assignees:      as,
 		c:              rt.client,
 		cfg:            cfg,
 		dirApproverMap: dirApproverMap,
 		approverDirMap: parseApprovers(dirApproverMap),
-		reviewers:      reviewers,
+		reviewers:      ro.AllReviewers(),
+		owner:          ro,
+		log:            log,
 	}
-	return s, nil
+	return &s, nil
 
 }
-func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, cmds []string) error {
-	rs, err := rt.newReviewState(ne)
+
+func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, log *logrus.Entry) error {
+	rs, err := rt.newReviewState(ne, log)
 	if err != nil {
 		return err
 	}
 
 	commenter := ne.GetCommenter()
-	check := func(cmd string) bool {
-		return canApplyCmd(
-			cmd, rs.prAuthor == commenter,
-			rs.isApprover(commenter), rs.cfg.AllowSelfApprove,
+	c := sComment{
+		comment: ne.GetComment(),
+		author:  commenter,
+	}
+	cmd, invalidCmd := rs.getCommands(&c)
+	if invalidCmd != "" {
+		cfg, _ := rt.pluginConfig()
+		s := fmt.Sprintf(
+			"You can't use command of `/%s`. Please see the [*command usage*](%s) to get detail",
+			strings.ToLower(invalidCmd), cfg.Trigger.CommandsLink,
+		)
+		rt.client.CreatePRComment(
+			rs.org, rs.repo, rs.prNumber,
+			op.FormatResponseRaw1(c.comment, ne.Comment.HtmlUrl, commenter, s),
 		)
 	}
-
-	for _, cmd := range cmds {
-		if !check(cmd) {
-			cfg, _ := rt.pluginConfig()
-			s := fmt.Sprintf(
-				"You can't use command of `/%s`. Please see the [*command usage*](%s) to get detail",
-				strings.ToLower(cmd), cfg.Trigger.CommandsLink,
-			)
-			rt.client.CreatePRComment(
-				rs.org, rs.repo, rs.prNumber,
-				op.FormatResponseRaw1(ne.GetComment(), ne.Comment.HtmlUrl, commenter, s),
-			)
-
-			break
-		}
-	}
-
-	if !rs.isReviewer(commenter) {
+	if cmd == "" || !rs.isReviewer(commenter) {
 		return nil
 	}
-	return rs.handle(false)
+
+	return rs.handle(false, cmd)
 }
 
 func parseApprovers(dirApproverMap map[string]sets.String) map[string]sets.String {

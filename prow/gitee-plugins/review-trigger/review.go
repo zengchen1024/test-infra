@@ -242,11 +242,11 @@ func (rt *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	if ne.IsCreatingCommentEvent() && ne.GetCommenter() != rt.botName {
 		cmds := parseCommandFromComment(ne.GetComment())
 		if len(cmds) > 0 {
-			return rt.handleReviewComment(ne, cmds)
+			return rt.handleReviewComment(ne, log)
 		}
 	}
 
-	return rt.handleCIStatusComment(ne)
+	return rt.handleCIStatusComment(ne, log)
 }
 
 func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) error {

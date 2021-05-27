@@ -65,7 +65,7 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 	for i := range comments {
 		c := &comments[i]
 
-		if c.User == nil || c.User.Login == rs.botName || !rs.isReviewer(c.User.Login) {
+		if c.User == nil || c.User.Login == rs.botName {
 			continue
 		}
 
@@ -96,10 +96,11 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 	validComments := make([]*sComment, 0, n)
 	for i := n - 1; i >= 0; i-- {
 		c := &newComments[i]
-		if done[c.author] {
+		if !rs.isReviewer(c.author) || done[c.author] {
 			continue
 		}
-		if cmd := rs.getCommands(c); cmd != "" {
+
+		if cmd, _ := rs.getCommands(c); cmd != "" {
 			c.comment = cmd
 			validComments = append(validComments, c)
 			done[c.author] = true
@@ -109,10 +110,10 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 	return validComments
 }
 
-func (rs reviewState) getCommands(c *sComment) string {
+func (rs reviewState) getCommands(c *sComment) (string, string) {
 	cmds := parseCommandFromComment(c.comment)
 	if len(cmds) == 0 {
-		return ""
+		return "", ""
 	}
 
 	check := func(cmd string) bool {
@@ -123,10 +124,14 @@ func (rs reviewState) getCommands(c *sComment) string {
 	}
 
 	lastCmd := ""
+	invalidCmd := ""
 	negatives := map[string]bool{}
 	positives := map[string]bool{}
 	for _, cmd := range cmds {
 		if !check(cmd) {
+			if invalidCmd == "" {
+				invalidCmd = cmd
+			}
 			continue
 		}
 
@@ -140,9 +145,9 @@ func (rs reviewState) getCommands(c *sComment) string {
 	}
 
 	if len(negatives) == 0 && len(positiveCmds) == len(positives) {
-		return cmdAPPROVE
+		return cmdAPPROVE, invalidCmd
 	}
-	return lastCmd
+	return lastCmd, invalidCmd
 }
 
 func (rs reviewState) applyComments(comments []*sComment) string {

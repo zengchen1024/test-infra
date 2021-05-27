@@ -13,24 +13,32 @@ var (
 	notificationRe    = regexp.MustCompile("^\\[Approval Notifier\\] This Pull-Request")
 )
 
-func createTips(reviewComments []*sComment) string {
-	approvers, _ := statApprover(reviewComments)
-
+func createTips(currentApprovers, suggestedApprovers []string) string {
 	s := ""
-	if len(approvers) > 0 {
-		s = fmt.Sprintf("It has been approved by: %s.\n", strings.Join(approvers, ", "))
+	if len(currentApprovers) > 0 {
+		s = fmt.Sprintf("\nIt has been approved by: %s.", strings.Join(currentApprovers, ", "))
+	}
+
+	s1 := ""
+	if len(suggestedApprovers) > 0 {
+		rs := make([]string, 0, len(suggestedApprovers))
+		for _, item := range suggestedApprovers {
+			rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
+		}
+		s1 = fmt.Sprintf(
+			"\nI suggests these approvers( %s ) to approve your PR.\nYou can assign the PR to them through the command `assign`, for example `/assign @%s`.",
+			strings.Join(rs, ", "), suggestedApprovers[0],
+		)
 	}
 
 	return fmt.Sprintf(
-		"%s **NOT APPROVED**\n\n%sIt still needs approval from approvers to be merged.",
-		notificationTitle, s,
+		"%s **NOT APPROVED**\n%s\nIt still needs approval from approvers to be merged.%s",
+		notificationTitle, s, s1,
 	)
 
 }
 
-func updateTips(label string, reviewComments []*sComment) string {
-	approvers, rejecter := statApprover(reviewComments)
-
+func updateTips(label string, approvers, rejecter []string) string {
 	desc := ""
 	switch label {
 	case labelApproved:
