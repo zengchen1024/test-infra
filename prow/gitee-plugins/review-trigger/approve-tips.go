@@ -5,56 +5,69 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 )
 
 var (
-	notificationTitle = "[Approval Notifier] This Pull-Request is"
-	notificationRe    = regexp.MustCompile("^\\[Approval Notifier\\] This Pull-Request")
+	notificationTitle   = "[Approval Notifier] This Pull-Request is"
+	notificationRe      = regexp.MustCompile("^\\[Approval Notifier\\] This Pull-Request")
+	notificationSpliter = "\n\n---\n\n"
 )
 
-func createTips(currentApprovers, suggestedApprovers []string) string {
-	s := ""
-	if len(currentApprovers) > 0 {
-		s = fmt.Sprintf("\nIt has been approved by: %s.", strings.Join(currentApprovers, ", "))
+func doesTipsHasPart2(comment string) bool {
+	return strings.Contains(comment, notificationSpliter)
+}
+
+func part2(suggestedApprovers []string, oldComment string) string {
+	if len(suggestedApprovers) > 0 {
+		v := convertReviewers(suggestedApprovers)
+		return fmt.Sprintf(
+			"%sI suggest these approvers( %s ) to approve your PR.\nYou can assign the PR to them by writing a comment of `/assign @%s`.",
+			notificationSpliter, strings.Join(v, ", "), strings.Join(suggestedApprovers, ", @"),
+		)
 	}
 
-	s1 := ""
-	if len(suggestedApprovers) > 0 {
-		rs := convertReviewers(suggestedApprovers)
-		s1 = fmt.Sprintf(
-			"\nI suggests these approvers( %s ) to approve your PR.\nYou can assign the PR to them through the command `assign`, for example `/assign @%s`.",
-			strings.Join(rs, ", "), suggestedApprovers[0],
-		)
+	v := strings.Split(oldComment, notificationSpliter)
+	if len(v) == 2 {
+		return notificationSpliter + v[1]
+	}
+
+	return ""
+}
+
+func lgtmTips(currentApprovers, suggestedApprovers []string, oldComment string) string {
+	s := ""
+	if len(currentApprovers) > 0 {
+		v := convertReviewers(currentApprovers)
+		s = fmt.Sprintf("\n\nIt has been approved by: %s.\nIt still needs approval from approvers to be merged.", strings.Join(v, ", "))
 	}
 
 	return fmt.Sprintf(
-		"%s **NOT APPROVED**\n%s\nIt still needs approval from approvers to be merged.%s",
-		notificationTitle, s, s1,
+		"%s **NOT APPROVED**%s%s",
+		notificationTitle, s, part2(suggestedApprovers, oldComment),
 	)
-
 }
 
-func updateTips(label string, approvers, rejecter []string) string {
-	desc := ""
-	switch label {
-	case labelApproved:
-		desc = fmt.Sprintf(
-			"%s **APPROVED**\n\nIt has been approved by: %s",
-			notificationTitle,
-			strings.Join(approvers, ", "),
-		)
-
-	case labelRequestChange:
-		if len(rejecter) > 0 {
-			desc = fmt.Sprintf(
-				"%s **NOT APPROVED**\n\nIt is rejected by: %s.\nPlease see the comments left by them and do more changes.\nThis pull-request will not be merged until these approvers comment /approve.",
-				notificationTitle, strings.Join(rejecter, ", "),
-			)
-		}
+func requestChangeTips(rejecter []string) string {
+	if len(rejecter) == 0 {
+		return ""
 	}
+	v := convertReviewers(rejecter)
+	return fmt.Sprintf(
+		"%s **Rejected**\n\nIt is rejected by: %s.\nPlease see the comments left by them and do more changes.",
+		notificationTitle, strings.Join(v, ", "),
+	)
+}
 
-	return desc
+func approvedTips(approvers []string) string {
+	v := convertReviewers(approvers)
+	return fmt.Sprintf(
+		"%s **APPROVED**\n\nIt has been approved by: %s",
+		notificationTitle,
+		strings.Join(v, ", "),
+	)
 }
 
 func convertReviewers(v []string) []string {
@@ -66,29 +79,42 @@ func convertReviewers(v []string) []string {
 }
 
 func statApprover(reviewComments []*sComment) ([]string, []string) {
-	r := map[string][]string{
-		cmdReject:  {},
-		cmdAPPROVE: {},
-	}
+	rejecters := sets.NewString()
+	approvers := sets.NewString()
 
 	for _, c := range reviewComments {
-		if cmdBelongsToApprover.Has(c.comment) {
-			r[c.comment] = append(r[c.comment], c.author)
+		switch c.comment {
+		case cmdReject:
+			rejecters.Insert(c.author)
+		case cmdAPPROVE:
+			approvers.Insert(c.author)
 		}
 	}
 
-	return r[cmdAPPROVE], r[cmdReject]
+	return approvers.List(), rejecters.List()
 }
 
-func findApproveTips(allComments []sdk.PullRequestComments, botName string) *sdk.PullRequestComments {
+type approveTips struct {
+	tipsID int
+	body   string
+}
+
+func (a approveTips) exists() bool {
+	return a.body != ""
+}
+
+func findApproveTips(allComments []sdk.PullRequestComments, botName string) approveTips {
 	for i := range allComments {
 		tips := &allComments[i]
 		if tips.User == nil || tips.User.Login != botName {
 			continue
 		}
 		if notificationRe.MatchString(tips.Body) {
-			return tips
+			return approveTips{
+				tipsID: int(tips.Id),
+				body:   tips.Body,
+			}
 		}
 	}
-	return nil
+	return approveTips{}
 }

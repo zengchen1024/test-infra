@@ -227,8 +227,8 @@ func (rt *trigger) deleteTips(org, repo string, prNumber int) error {
 	}
 
 	tips := findApproveTips(comments, rt.botName)
-	if tips != nil {
-		return rt.client.DeletePRComment(org, repo, int(tips.Id))
+	if tips.exists() {
+		return rt.client.DeletePRComment(org, repo, tips.tipsID)
 	}
 	return nil
 }

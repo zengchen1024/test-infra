@@ -5,8 +5,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"k8s.io/test-infra/prow/gitee-plugins/review-trigger/approvers"
-	"k8s.io/test-infra/prow/github"
 	"k8s.io/test-infra/prow/repoowners"
 )
 
@@ -53,39 +51,77 @@ func (rs reviewState) handle(isCIPassed bool, latestComment string) error {
 func (rs reviewState) applyLabel(label string, reviewComments []*sComment, allComments []sdk.PullRequestComments, isCIPassed bool, latestComment string) error {
 	cls := rs.currentLabels
 	tips := findApproveTips(allComments, rs.botName)
-
 	approvers, rejecters := statApprover(reviewComments)
 
-	var err error
-	desc := ""
 	switch label {
 	case labelRequestChange:
-		err = rs.applyRequestChangeLabel(cls)
-		desc = updateTips(label, approvers, rejecters)
+		return rs.applyRequestChange(cls, rejecters, tips)
 	case labelLGTM:
-		err = rs.applyLGTMLabel(cls)
-		if isCIPassed || (cls[rs.cfg.LabelForCIPassed] && (tips == nil || latestComment == cmdAPPROVE)) {
-			desc = createTips(approvers, rs.suggestApprover(approvers))
-		}
+		return rs.applyLGTM(cls, approvers, isCIPassed, latestComment, tips)
 	case labelApproved:
-		err = rs.applyApprovedLabel(cls)
-		desc = updateTips(label, approvers, rejecters)
+		return rs.applyApproved(cls, approvers, tips)
 	}
+
+	return nil
+}
+
+func (rs reviewState) applyLGTM(cls map[string]bool, approvers []string, isCIPassed bool, latestComment string, oldTips approveTips) error {
 	errs := newErrors()
+	err := rs.applyLGTMLabel(cls)
 	errs.addError(err)
 
-	if desc != "" {
-		if tips != nil {
-			if tips.Body != desc {
-				err := rs.c.UpdatePRComment(rs.org, rs.repo, int(tips.Id), desc)
-				errs.addError(err)
-			}
-		} else {
-			err := rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
+	if isCIPassed || cls[rs.cfg.LabelForCIPassed] {
+		var sa []string
+		if !oldTips.exists() || !doesTipsHasPart2(oldTips.body) || latestComment == cmdAPPROVE {
+			sa = rs.suggestApprover(approvers)
+		}
+
+		desc := lgtmTips(approvers, sa, oldTips.body)
+		err = rs.writeApproveTips(desc, oldTips)
+		errs.addError(err)
+	}
+
+	return errs.err()
+}
+
+func (rs reviewState) applyRequestChange(cls map[string]bool, rejecters []string, oldTips approveTips) error {
+	errs := newErrors()
+	err := rs.applyRequestChangeLabel(cls)
+	errs.addError(err)
+
+	if len(rejecters) == 0 {
+		if oldTips.exists() {
+			err = rs.c.DeletePRComment(rs.org, rs.repo, oldTips.tipsID)
 			errs.addError(err)
 		}
+	} else {
+		err = rs.writeApproveTips(requestChangeTips(rejecters), oldTips)
+		errs.addError(err)
 	}
 	return errs.err()
+}
+
+func (rs reviewState) applyApproved(cls map[string]bool, approvers []string, oldTips approveTips) error {
+	errs := newErrors()
+	err := rs.applyApprovedLabel(cls)
+	errs.addError(err)
+
+	err = rs.writeApproveTips(approvedTips(approvers), oldTips)
+	errs.addError(err)
+
+	return errs.err()
+}
+
+func (rs reviewState) writeApproveTips(desc string, oldTips approveTips) error {
+	// can't check `if desc == oldTips.body` instead
+	if desc == "" || desc == oldTips.body {
+		return nil
+	}
+
+	if oldTips.exists() {
+		return rs.c.UpdatePRComment(rs.org, rs.repo, oldTips.tipsID, desc)
+	}
+	return rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
 }
 
 func (rs reviewState) applyApprovedLabel(cls map[string]bool) error {
@@ -180,9 +216,16 @@ func (rs reviewState) isReviewer(author string) bool {
 }
 
 func (rs reviewState) suggestApprover(currentApprovers []string) []string {
-	return approvers.SuggestApprovers(
-		currentApprovers, rs.assignees, rs.filenames, rs.prNumber,
-		rs.cfg.NumberOfApprovers, rs.owner, rs.prAuthor,
-		rs.cfg.AllowSelfApprove, rs.log,
-	)
+	ah := approverHelper{
+		currentApprovers:  currentApprovers,
+		assignees:         rs.assignees,
+		filenames:         rs.filenames,
+		prNumber:          rs.prNumber,
+		numberOfApprovers: rs.cfg.NumberOfApprovers,
+		repoOwner:         rs.owner,
+		prAuthor:          rs.prAuthor,
+		allowSelfApprove:  rs.cfg.AllowSelfApprove,
+		log:               rs.log,
+	}
+	return ah.suggestApprovers()
 }
