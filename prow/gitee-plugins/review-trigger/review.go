@@ -264,7 +264,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 	}
 	pr := e.PullRequest
 	prNumber := int(pr.Number)
-	prAuthor := pr.User.Login
+	prAuthor := github.NormLogin(pr.User.Login)
 	reviewers, err := sg.suggestReviewers(org, repo, pr.Base.Ref, prAuthor, prNumber)
 	if err != nil {
 		return err
@@ -273,11 +273,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 		return nil
 	}
 
-	rs := make([]string, 0, len(reviewers))
-	for _, item := range reviewers {
-		rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
-	}
-
+	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
 		org, repo, prNumber, fmt.Sprintf(
 			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",

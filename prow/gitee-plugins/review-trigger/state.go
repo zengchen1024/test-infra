@@ -182,6 +182,7 @@ func (rs reviewState) isReviewer(author string) bool {
 func (rs reviewState) suggestApprover(currentApprovers []string) []string {
 	return approvers.SuggestApprovers(
 		currentApprovers, rs.assignees, rs.filenames, rs.prNumber,
-		rs.cfg.NumberOfApprovers, rs.owner, rs.log,
+		rs.cfg.NumberOfApprovers, rs.owner, rs.prAuthor,
+		rs.cfg.AllowSelfApprove, rs.log,
 	)
 }

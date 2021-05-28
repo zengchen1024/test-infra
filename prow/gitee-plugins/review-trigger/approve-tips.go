@@ -21,10 +21,7 @@ func createTips(currentApprovers, suggestedApprovers []string) string {
 
 	s1 := ""
 	if len(suggestedApprovers) > 0 {
-		rs := make([]string, 0, len(suggestedApprovers))
-		for _, item := range suggestedApprovers {
-			rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
-		}
+		rs := convertReviewers(suggestedApprovers)
 		s1 = fmt.Sprintf(
 			"\nI suggests these approvers( %s ) to approve your PR.\nYou can assign the PR to them through the command `assign`, for example `/assign @%s`.",
 			strings.Join(rs, ", "), suggestedApprovers[0],
@@ -58,6 +55,14 @@ func updateTips(label string, approvers, rejecter []string) string {
 	}
 
 	return desc
+}
+
+func convertReviewers(v []string) []string {
+	rs := make([]string, 0, len(v))
+	for _, item := range v {
+		rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
+	}
+	return rs
 }
 
 func statApprover(reviewComments []*sComment) ([]string, []string) {

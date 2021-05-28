@@ -46,7 +46,7 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent, log *logrus.Entry) (*rev
 		repo:           repo,
 		headSHA:        ne.PullRequest.Head.Sha,
 		botName:        rt.botName,
-		prAuthor:       ne.PullRequest.User.Login,
+		prAuthor:       github.NormLogin(ne.PullRequest.User.Login),
 		prNumber:       ne.GetPRNumber(),
 		filenames:      filenames,
 		currentLabels:  gitee.GetLabelFromEvent(ne.PullRequest.Labels),
