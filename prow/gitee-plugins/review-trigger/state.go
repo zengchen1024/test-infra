@@ -1,6 +1,8 @@
 package reviewtrigger
 
 import (
+	"fmt"
+
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,61 +53,64 @@ func (rs reviewState) handle(isCIPassed bool, latestComment string) error {
 func (rs reviewState) applyLabel(label string, reviewComments []*sComment, allComments []sdk.PullRequestComments, isCIPassed bool, latestComment string) error {
 	cls := rs.currentLabels
 	tips := findApproveTips(allComments, rs.botName)
-	approvers, rejecters := statApprover(reviewComments)
 
 	switch label {
 	case labelRequestChange:
-		return rs.applyRequestChange(cls, rejecters, tips)
+		return rs.applyRequestChange(cls, reviewComments, tips)
 	case labelLGTM:
-		return rs.applyLGTM(cls, approvers, isCIPassed, latestComment, tips)
+		return rs.applyLGTM(cls, reviewComments, isCIPassed, latestComment, tips)
 	case labelApproved:
-		return rs.applyApproved(cls, approvers, tips)
+		return rs.applyApproved(cls, reviewComments, tips)
 	}
 
 	return nil
 }
 
-func (rs reviewState) applyLGTM(cls map[string]bool, approvers []string, isCIPassed bool, latestComment string, oldTips approveTips) error {
+func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment, isCIPassed bool, latestComment string, oldTips approveTips) error {
 	errs := newErrors()
 	err := rs.applyLGTMLabel(cls)
 	errs.addError(err)
 
+	approvers, reviewers := statOnesWhoAgreed(reviewComments)
+	var sa []string
 	if isCIPassed || cls[rs.cfg.LabelForCIPassed] {
-		var sa []string
 		if !oldTips.exists() || !doesTipsHasPart2(oldTips.body) || latestComment == cmdAPPROVE {
 			sa = rs.suggestApprover(approvers)
 		}
-
-		desc := lgtmTips(approvers, sa, oldTips.body)
-		err = rs.writeApproveTips(desc, oldTips)
-		errs.addError(err)
 	}
+
+	desc := lgtmTips(approvers, reviewers, sa, oldTips.body)
+	err = rs.writeApproveTips(desc, oldTips)
+	errs.addError(err)
 
 	return errs.err()
 }
 
-func (rs reviewState) applyRequestChange(cls map[string]bool, rejecters []string, oldTips approveTips) error {
+func (rs reviewState) applyRequestChange(cls map[string]bool, reviewComments []*sComment, oldTips approveTips) error {
 	errs := newErrors()
 	err := rs.applyRequestChangeLabel(cls)
 	errs.addError(err)
 
+	rejecters, reviewers := statOnesWhoDisagreed(reviewComments)
+
+	desc := ""
 	if len(rejecters) == 0 {
-		if oldTips.exists() {
-			err = rs.c.DeletePRComment(rs.org, rs.repo, oldTips.tipsID)
-			errs.addError(err)
-		}
+		desc = requestChangeTips(reviewers)
 	} else {
-		err = rs.writeApproveTips(requestChangeTips(rejecters), oldTips)
-		errs.addError(err)
+		desc = rejectTips(rejecters)
 	}
+	err = rs.writeApproveTips(desc, oldTips)
+	errs.addError(err)
+
 	return errs.err()
 }
 
-func (rs reviewState) applyApproved(cls map[string]bool, approvers []string, oldTips approveTips) error {
+func (rs reviewState) applyApproved(cls map[string]bool, reviewComments []*sComment, oldTips approveTips) error {
 	errs := newErrors()
 	err := rs.applyApprovedLabel(cls)
 	errs.addError(err)
 
+	approvers, _ := statOnesWhoAgreed(reviewComments)
 	err = rs.writeApproveTips(approvedTips(approvers), oldTips)
 	errs.addError(err)
 
@@ -162,7 +167,7 @@ func (rs reviewState) applyLGTMLabel(cls map[string]bool) error {
 			errs.addError(err)
 		} else {
 			err := rs.c.CreatePRComment(
-				rs.org, rs.repo, rs.prNumber, "lgtm label has been added.",
+				rs.org, rs.repo, rs.prNumber, fmt.Sprintf("%s label has been added.", l),
 			)
 			errs.addError(err)
 		}
@@ -183,8 +188,14 @@ func (rs reviewState) applyRequestChangeLabel(cls map[string]bool) error {
 
 	l := labelRequestChange
 	if !cls[l] {
-		err := rs.c.AddPRLabel(rs.org, rs.repo, rs.prNumber, l)
-		errs.addError(err)
+		if err := rs.c.AddPRLabel(rs.org, rs.repo, rs.prNumber, l); err != nil {
+			errs.addError(err)
+		} else {
+			err := rs.c.CreatePRComment(
+				rs.org, rs.repo, rs.prNumber, fmt.Sprintf("%s label has been added.", l),
+			)
+			errs.addError(err)
+		}
 	}
 
 	for _, l := range []string{labelApproved, labelLGTM, labelCanReview} {

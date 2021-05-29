@@ -70,13 +70,18 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 			continue
 		}
 
+		author := github.NormLogin(c.User.Login)
+		if !rs.isReviewer(author) {
+			continue
+		}
+
 		ut, err := time.Parse(time.RFC3339, c.UpdatedAt)
 		if err != nil || ut.Before(startTime) {
 			continue
 		}
 
 		r = append(r, sComment{
-			author:  github.NormLogin(c.User.Login),
+			author:  author,
 			t:       ut,
 			comment: c.Body,
 		})
@@ -97,7 +102,7 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 	validComments := make([]*sComment, 0, n)
 	for i := n - 1; i >= 0; i-- {
 		c := &newComments[i]
-		if !rs.isReviewer(c.author) || done[c.author] {
+		if done[c.author] {
 			continue
 		}
 
