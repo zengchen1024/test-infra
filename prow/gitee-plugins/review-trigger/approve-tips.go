@@ -54,7 +54,7 @@ func lgtmTips(currentApprovers, reviewers, suggestedApprovers []string, oldComme
 	}
 
 	return fmt.Sprintf(
-		"%s **Looks Good**%s%s",
+		"%s **Looks Good**.%s%s",
 		notificationTitle, s, part2(suggestedApprovers, oldComment),
 	)
 }
@@ -62,7 +62,7 @@ func lgtmTips(currentApprovers, reviewers, suggestedApprovers []string, oldComme
 func rejectTips(rejecters []string) string {
 	v := convertReviewers(rejecters)
 	return fmt.Sprintf(
-		"%s is **Rejected**\n\nIt is rejected by: %s.\nPlease see the comments left by them and do more changes.",
+		"%s is **Rejected**.\n\nIt is rejected by: %s.\nPlease see the comments left by them and do more changes.",
 		notificationTitle, strings.Join(v, ", "),
 	)
 }
@@ -70,7 +70,7 @@ func rejectTips(rejecters []string) string {
 func requestChangeTips(reviewers []string) string {
 	v := convertReviewers(reviewers)
 	return fmt.Sprintf(
-		"%s is **Requested Change**\n\nIt is requested change by: %s.\nPlease see the comments left by them and do more changes.",
+		"%s is **Requested Change**.\n\nIt is requested change by: %s.\nPlease see the comments left by them and do more changes.",
 		notificationTitle, strings.Join(v, ", "),
 	)
 }
@@ -78,7 +78,7 @@ func requestChangeTips(reviewers []string) string {
 func approvedTips(approvers []string) string {
 	v := convertReviewers(approvers)
 	return fmt.Sprintf(
-		"%s is **APPROVED**\n\nIt has been approved by: %s",
+		"%s is **APPROVED**.\n\nIt has been approved by: %s",
 		notificationTitle,
 		strings.Join(v, ", "),
 	)
