@@ -302,7 +302,7 @@ func (c *client) RemovePRLabel(org, repo string, number int, label string) error
 	v, err := c.ac.PullRequestsApi.DeleteV5ReposOwnerRepoPullsLabel(
 		context.Background(), org, repo, int32(number), label, nil)
 
-	if v.StatusCode == 404 {
+	if v != nil && v.StatusCode == 404 {
 		return nil
 	}
 	return formatErr(err, "remove label of pr")
