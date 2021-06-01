@@ -227,8 +227,8 @@ func (rt *trigger) deleteTips(org, repo string, prNumber int) error {
 	}
 
 	tips := findApproveTips(comments, rt.botName)
-	if tips != nil {
-		return rt.client.DeletePRComment(org, repo, int(tips.Id))
+	if tips.exists() {
+		return rt.client.DeletePRComment(org, repo, tips.tipsID)
 	}
 	return nil
 }
@@ -242,11 +242,11 @@ func (rt *trigger) handleNoteEvent(e *sdk.NoteEvent, log *logrus.Entry) error {
 	if ne.IsCreatingCommentEvent() && ne.GetCommenter() != rt.botName {
 		cmds := parseCommandFromComment(ne.GetComment())
 		if len(cmds) > 0 {
-			return rt.handleReviewComment(ne, cmds)
+			return rt.handleReviewComment(ne, log)
 		}
 	}
 
-	return rt.handleCIStatusComment(ne)
+	return rt.handleCIStatusComment(ne, log)
 }
 
 func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) error {
@@ -264,7 +264,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 	}
 	pr := e.PullRequest
 	prNumber := int(pr.Number)
-	prAuthor := pr.User.Login
+	prAuthor := github.NormLogin(pr.User.Login)
 	reviewers, err := sg.suggestReviewers(org, repo, pr.Base.Ref, prAuthor, prNumber)
 	if err != nil {
 		return err
@@ -273,11 +273,7 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 		return nil
 	}
 
-	rs := make([]string, 0, len(reviewers))
-	for _, item := range reviewers {
-		rs = append(rs, fmt.Sprintf("[*%s*](https://gitee.com/%s)", item, item))
-	}
-
+	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
 		org, repo, prNumber, fmt.Sprintf(
 			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",

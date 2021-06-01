@@ -8,6 +8,7 @@ import (
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/test-infra/prow/github"
 )
 
 const (
@@ -65,7 +66,12 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 	for i := range comments {
 		c := &comments[i]
 
-		if c.User == nil || c.User.Login == rs.botName || !rs.isReviewer(c.User.Login) {
+		if c.User == nil || c.User.Login == rs.botName {
+			continue
+		}
+
+		author := github.NormLogin(c.User.Login)
+		if !rs.isReviewer(author) {
 			continue
 		}
 
@@ -75,7 +81,7 @@ func (rs reviewState) preTreatComments(comments []sdk.PullRequestComments, start
 		}
 
 		r = append(r, sComment{
-			author:  c.User.Login,
+			author:  author,
 			t:       ut,
 			comment: c.Body,
 		})
@@ -99,7 +105,8 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 		if done[c.author] {
 			continue
 		}
-		if cmd := rs.getCommands(c); cmd != "" {
+
+		if cmd, _ := rs.getCommands(c); cmd != "" {
 			c.comment = cmd
 			validComments = append(validComments, c)
 			done[c.author] = true
@@ -109,10 +116,10 @@ func (rs reviewState) filterComments(comments []sdk.PullRequestComments, startTi
 	return validComments
 }
 
-func (rs reviewState) getCommands(c *sComment) string {
+func (rs reviewState) getCommands(c *sComment) (string, string) {
 	cmds := parseCommandFromComment(c.comment)
 	if len(cmds) == 0 {
-		return ""
+		return "", ""
 	}
 
 	check := func(cmd string) bool {
@@ -123,10 +130,14 @@ func (rs reviewState) getCommands(c *sComment) string {
 	}
 
 	lastCmd := ""
+	invalidCmd := ""
 	negatives := map[string]bool{}
 	positives := map[string]bool{}
 	for _, cmd := range cmds {
 		if !check(cmd) {
+			if invalidCmd == "" {
+				invalidCmd = cmd
+			}
 			continue
 		}
 
@@ -140,9 +151,9 @@ func (rs reviewState) getCommands(c *sComment) string {
 	}
 
 	if len(negatives) == 0 && len(positiveCmds) == len(positives) {
-		return cmdAPPROVE
+		return cmdAPPROVE, invalidCmd
 	}
-	return lastCmd
+	return lastCmd, invalidCmd
 }
 
 func (rs reviewState) applyComments(comments []*sComment) string {

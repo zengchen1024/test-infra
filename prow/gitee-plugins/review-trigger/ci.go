@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"k8s.io/test-infra/prow/gitee"
 )
 
@@ -78,7 +79,7 @@ func parseCIStatus(cfg *pluginConfig, comment string) string {
 	return cfg.runningStatusOfJob
 }
 
-func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent) error {
+func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent, log *logrus.Entry) error {
 	org, repo := ne.GetOrgRep()
 	cfg, err := rt.orgRepoConfig(org, repo)
 	if err != nil {
@@ -92,10 +93,10 @@ func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent) error {
 
 	errs := newErrors()
 	if status == cfg.SuccessStatusOfJob {
-		if rs, err := rt.newReviewState(ne); err != nil {
+		if rs, err := rt.newReviewState(ne, log); err != nil {
 			errs.add(fmt.Sprintf("new review state, err:%s", err.Error()))
 		} else {
-			if err := rs.handle(true); err != nil {
+			if err := rs.handle(true, ""); err != nil {
 				errs.add(fmt.Sprintf("working on CI success, err:%s", err.Error()))
 			}
 		}
