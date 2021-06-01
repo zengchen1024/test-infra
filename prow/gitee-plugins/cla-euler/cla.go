@@ -157,6 +157,8 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 		}
 	}
+
+	deleteSignGuide(org, repo, prNumber, cl.ghc.giteeClient)
 	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
 }
 
@@ -303,8 +305,28 @@ func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequest
 
 }
 
+func deleteSignGuide(org, repo string, number int, c giteeClient) {
+	v, err := c.ListPRComments(org, repo, number)
+	if err != nil {
+		return
+	}
+
+	prefix := signGuideTitle()
+
+	for i := range v {
+		item := &v[i]
+		if strings.HasPrefix(item.Body, prefix) {
+			c.DeletePRComment(org, repo, int(item.Id))
+		}
+	}
+}
+
+func signGuideTitle() string {
+	return "Thanks for your pull request. Before we can look at your pull request, you'll need to sign a Contributor License Agreement (CLA)."
+}
+
 func signGuide(signURL, platform, cInfo string) string {
-	s := `Thanks for your pull request. Before we can look at your pull request, you'll need to sign a Contributor License Agreement (CLA).
+	s := `%s
 
 %s
 
@@ -320,7 +342,7 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 - If you have done the above and are still having issues with the CLA being reported as unsigned, please feel free to file an issue.
 	`
 
-	return fmt.Sprintf(s, cInfo, signURL, platform)
+	return fmt.Sprintf(signGuideTitle(), s, cInfo, signURL, platform)
 }
 
 func alreadySigned(user string) string {

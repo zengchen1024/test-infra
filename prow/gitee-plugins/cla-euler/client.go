@@ -6,7 +6,9 @@ type giteeClient interface {
 	AddPRLabel(owner, repo string, number int, label string) error
 	RemovePRLabel(owner, repo string, number int, label string) error
 	CreatePRComment(owner, repo string, number int, comment string) error
+	DeletePRComment(org, repo string, ID int) error
 	GetPRCommits(org, repo string, number int) ([]sdk.PullRequestCommits, error)
+	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
 }
 
 type ghclient struct {
