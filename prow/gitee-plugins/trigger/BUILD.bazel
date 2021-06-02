@@ -19,6 +19,7 @@ go_library(
         "//prow/github:go_default_library",
         "//prow/job-reporter:go_default_library",
         "//prow/job-reporter/gitee:go_default_library",
+        "//prow/labels:go_default_library",
         "//prow/pluginhelp:go_default_library",
         "//prow/plugins:go_default_library",
         "//prow/plugins/trigger:go_default_library",

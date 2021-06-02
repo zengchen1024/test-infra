@@ -102,6 +102,10 @@ func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		return err
 	}
 
+	f := func(org, repo string) bool {
+		return t.ghc.hasApprovedPR(org, repo)
+	}
+
 	return origint.HandlePR(
 		t.buildOriginClient(log),
 		c,
@@ -109,6 +113,7 @@ func (t *trigger) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.En
 		func(m []prowConfig.Presubmit) {
 			SetPresubmit(e.Repository.Namespace, e.Repository.Path, m)
 		},
+		f,
 	)
 }
 

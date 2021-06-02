@@ -5,9 +5,11 @@ import (
 	"sort"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
+
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	reporter "k8s.io/test-infra/prow/job-reporter/gitee"
+	"k8s.io/test-infra/prow/labels"
 )
 
 type giteeClient interface {
@@ -22,6 +24,7 @@ type giteeClient interface {
 	RemovePRLabel(org, repo string, number int, label string) error
 	GetPRLabels(org, repo string, number int) ([]sdk.Label, error)
 	ListPRComments(org, repo string, number int) ([]sdk.PullRequestComments, error)
+	GetPullRequests(org, repo string, opts gitee.ListPullRequestOpt) ([]sdk.PullRequest, error)
 }
 
 type ghclient struct {
@@ -105,4 +108,17 @@ func (c *ghclient) GetCombinedStatus(org, repo, ref string) (*github.CombinedSta
 
 func (c *ghclient) DeleteStaleComments(org, repo string, number int, comments []github.IssueComment, isStale func(github.IssueComment) bool) error {
 	return fmt.Errorf("DeleteStaleComments is not used in original trigger")
+}
+
+func (c *ghclient) hasApprovedPR(org, repo string) bool {
+	opt := gitee.ListPullRequestOpt{
+		State:  gitee.StatusOpen,
+		Labels: []string{labels.Approved},
+	}
+
+	if v, err := c.GetPullRequests(org, repo, opt); err == nil {
+		return len(v) > 0
+	}
+
+	return false
 }

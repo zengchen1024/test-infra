@@ -164,15 +164,12 @@ func ConvertPullRequestAction(e *sdk.PullRequestEvent) github.PullRequestEventAc
 }
 
 func convertPullRequestLabel(e *sdk.PullRequestEvent) []github.Label {
-	/*
-		r := make([]github.Label, 0, len(e.PullRequest.Labels))
+	r := make([]github.Label, 0, len(e.PullRequest.Labels))
 
-		for _, i := range e.PullRequest.Labels {
-			r = append(r, github.Label{Name: i.Name})
-		}
-		return r
-	*/
-	return []github.Label{}
+	for _, i := range e.PullRequest.Labels {
+		r = append(r, github.Label{Name: i.Name})
+	}
+	return r
 }
 
 func checkNoteEvent(e *sdk.NoteEvent) error {
