@@ -14,7 +14,7 @@ var (
 	HelpProvider = helpProvider
 )
 
-func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, setPresubmit func([]config.Presubmit)) error {
+func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, setPresubmit func([]config.Presubmit), hasApprovedPR func(org, repo string) bool) error {
 	org, repo, a := orgRepoAuthor(pr.PullRequest)
 	author := string(a)
 	num := pr.PullRequest.Number
@@ -89,7 +89,13 @@ func HandlePR(c Client, trigger plugins.Trigger, pr github.PullRequestEvent, set
 		}
 	case github.PullRequestActionEdited:
 		// the base of the PR changed and we need to re-test it
-		return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
+		if hasApprovedPR(org, repo) {
+			if github.HasLabel(labels.Approved, pr.PullRequest.Labels) {
+				return buildAll(c, &pr.PullRequest, pr.GUID, baseSHA, presubmits)
+			}
+		} else {
+			return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
+		}
 	case github.PullRequestActionSynchronize:
 		return buildAllIfTrusted(c, trigger, pr, baseSHA, presubmits)
 	case github.PullRequestActionLabeled:
