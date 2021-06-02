@@ -342,7 +342,7 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 - If you have done the above and are still having issues with the CLA being reported as unsigned, please feel free to file an issue.
 	`
 
-	return fmt.Sprintf(signGuideTitle(), s, cInfo, signURL, platform)
+	return fmt.Sprintf(s, signGuideTitle(), cInfo, signURL, platform)
 }
 
 func alreadySigned(user string) string {
