@@ -12,20 +12,25 @@ import (
 )
 
 type reviewerHelper struct {
+	org      string
+	repo     string
+	prAuthor string
+	prNumber int
+
 	c   ghclient
 	roc repoowners.RepoOwner
 	log *logrus.Entry
 	cfg reviewerConfig
 }
 
-func (r reviewerHelper) suggestReviewers(org, repo, prAuthor string, prNumber int) ([]string, error) {
-	changes, err := r.c.getPullRequestChanges(org, repo, prNumber)
+func (r reviewerHelper) suggestReviewers() ([]string, error) {
+	changes, err := r.c.getPullRequestChanges(r.org, r.repo, r.prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("error getting PR changes: %v", err)
 	}
 
 	reviewerCount := r.cfg.ReviewerCount
-	excludedReviewers := sets.NewString(prAuthor)
+	excludedReviewers := sets.NewString(r.prAuthor)
 	reviewers := r.getReviewers(r.roc, changes, reviewerCount, excludedReviewers)
 	if len(reviewers) < reviewerCount && !r.cfg.ExcludeApprovers {
 		approvers := r.getReviewers(

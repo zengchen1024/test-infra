@@ -264,16 +264,16 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 	}
 
 	sg := reviewerHelper{
-		c:   rt.client,
-		roc: ow,
-		log: log,
-		cfg: cfg.Reviewers,
+		org:      org,
+		repo:     repo,
+		prAuthor: github.NormLogin(pr.User.Login),
+		prNumber: int(pr.Number),
+		c:        rt.client,
+		roc:      ow,
+		log:      log,
+		cfg:      cfg.Reviewers,
 	}
-
-	prNumber := int(pr.Number)
-	prAuthor := github.NormLogin(pr.User.Login)
-
-	reviewers, err := sg.suggestReviewers(org, repo, prAuthor, prNumber)
+	reviewers, err := sg.suggestReviewers()
 	if err != nil {
 		return err
 	}
@@ -283,9 +283,9 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 
 	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
-		org, repo, prNumber, fmt.Sprintf(
+		org, repo, sg.prNumber, fmt.Sprintf(
 			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",
-			prAuthor, strings.Join(rs, ", "), reviewers[0],
+			sg.prAuthor, strings.Join(rs, ", "), reviewers[0],
 		),
 	)
 }
