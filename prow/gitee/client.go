@@ -155,16 +155,26 @@ func (c *client) getUserData() error {
 }
 
 func (c *client) ListCollaborators(org, repo string) ([]github.User, error) {
-	cs, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaborators(context.Background(), org, repo, nil)
-	if err != nil {
-		return nil, formatErr(err, "list collaborators")
-	}
 	var r []github.User
-	for _, i := range cs {
-		c := github.User{
-			Login: i.Login,
+
+	opt := sdk.GetV5ReposOwnerRepoCollaboratorsOpts{}
+	p := int32(1)
+	for {
+		opt.Page = optional.NewInt32(p)
+		cs, _, err := c.ac.RepositoriesApi.GetV5ReposOwnerRepoCollaborators(context.Background(), org, repo, &opt)
+		if err != nil {
+			return nil, formatErr(err, "list collaborators")
 		}
-		r = append(r, c)
+		if len(cs) == 0 {
+			break
+		}
+		for _, i := range cs {
+			c := github.User{
+				Login: i.Login,
+			}
+			r = append(r, c)
+		}
+		p++
 	}
 	return r, nil
 }

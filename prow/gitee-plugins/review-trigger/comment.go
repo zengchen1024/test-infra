@@ -10,12 +10,33 @@ import (
 	"k8s.io/test-infra/prow/gitee"
 	"k8s.io/test-infra/prow/github"
 	op "k8s.io/test-infra/prow/plugins"
+	"k8s.io/test-infra/prow/repoowners"
 )
+
+func (rt *trigger) newRepoOwner(org, repo, branch string, cfg *pluginConfig, log *logrus.Entry) (repoowners.RepoOwner, error) {
+	if cfg.isBranchWithoutOwners(branch) {
+		cs, err := rt.client.listCollaborators(org, repo)
+		if err != nil {
+			return nil, err
+		}
+		return repoowners.NewRepoOwners(cs, log), nil
+	}
+
+	oc, err := rt.oc.LoadRepoOwners(org, repo, branch)
+	if err != nil {
+		return nil, fmt.Errorf("error loading RepoOwners: %v", err)
+	}
+	return oc, nil
+}
 
 func (rt *trigger) newReviewState(ne gitee.PRNoteEvent, log *logrus.Entry) (*reviewState, error) {
 	org, repo := ne.GetOrgRep()
+	cfg, err := rt.orgRepoConfig(org, repo)
+	if err != nil {
+		return nil, err
+	}
 
-	ro, err := rt.oc.LoadRepoOwners(org, repo, ne.PullRequest.Base.Ref)
+	ro, err := rt.newRepoOwner(org, repo, ne.PullRequest.Base.Ref, cfg, log)
 	if err != nil {
 		return nil, err
 	}
@@ -28,11 +49,6 @@ func (rt *trigger) newReviewState(ne gitee.PRNoteEvent, log *logrus.Entry) (*rev
 	dirApproverMap := map[string]sets.String{}
 	for _, filename := range filenames {
 		dirApproverMap[filename] = ro.Approvers(filename)
-	}
-
-	cfg, err := rt.orgRepoConfig(org, repo)
-	if err != nil {
-		return nil, err
 	}
 
 	v := ne.PullRequest.Assignees

@@ -256,16 +256,24 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 		return err
 	}
 
+	pr := e.PullRequest
+
+	ow, err := rt.newRepoOwner(org, repo, pr.Base.Ref, cfg, log)
+	if err != nil {
+		return err
+	}
+
 	sg := reviewerHelper{
 		c:   rt.client,
-		roc: rt.oc,
+		roc: ow,
 		log: log,
 		cfg: cfg.Reviewers,
 	}
-	pr := e.PullRequest
+
 	prNumber := int(pr.Number)
 	prAuthor := github.NormLogin(pr.User.Login)
-	reviewers, err := sg.suggestReviewers(org, repo, pr.Base.Ref, prAuthor, prNumber)
+
+	reviewers, err := sg.suggestReviewers(org, repo, prAuthor, prNumber)
 	if err != nil {
 		return err
 	}
