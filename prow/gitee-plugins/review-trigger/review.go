@@ -168,7 +168,7 @@ func (rt *trigger) welcome(org, repo string, prNumber int) error {
 		org, repo, prNumber,
 		fmt.Sprintf(
 			"Thank your for your pull-request.\n\nThe full list of commands accepted by me can be found at [**here**](%s).\nYou can get details about the review process of pull-request at [**here**](%s)",
-			cfg.Trigger.CommandsLink, "https://github.com/opensourceways/test-infra/blob/sync-5-22/prow/gitee-plugins/review-trigger/review.md",
+			cfg.Trigger.commandsLink(org, repo), "https://github.com/opensourceways/test-infra/blob/sync-5-22/prow/gitee-plugins/review-trigger/review.md",
 		),
 	)
 }
@@ -256,16 +256,24 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 		return err
 	}
 
-	sg := reviewerHelper{
-		c:   rt.client,
-		roc: rt.oc,
-		log: log,
-		cfg: cfg.Reviewers,
-	}
 	pr := e.PullRequest
-	prNumber := int(pr.Number)
-	prAuthor := github.NormLogin(pr.User.Login)
-	reviewers, err := sg.suggestReviewers(org, repo, pr.Base.Ref, prAuthor, prNumber)
+
+	ow, err := rt.newRepoOwner(org, repo, pr.Base.Ref, cfg, log)
+	if err != nil {
+		return err
+	}
+
+	sg := reviewerHelper{
+		org:      org,
+		repo:     repo,
+		prAuthor: github.NormLogin(pr.User.Login),
+		prNumber: int(pr.Number),
+		c:        rt.client,
+		roc:      ow,
+		log:      log,
+		cfg:      cfg.Reviewers,
+	}
+	reviewers, err := sg.suggestReviewers()
 	if err != nil {
 		return err
 	}
@@ -275,9 +283,9 @@ func (rt *trigger) suggestReviewers(e *sdk.PullRequestEvent, log *logrus.Entry) 
 
 	rs := convertReviewers(reviewers)
 	return rt.client.CreatePRComment(
-		org, repo, prNumber, fmt.Sprintf(
+		org, repo, sg.prNumber, fmt.Sprintf(
 			"@%s, suggests these reviewers( %s ) to review your code. You can ask one of them by writing `@%s` in a comment",
-			prAuthor, strings.Join(rs, ", "), reviewers[0],
+			sg.prAuthor, strings.Join(rs, ", "), reviewers[0],
 		),
 	)
 }

@@ -124,7 +124,7 @@ func (rs reviewState) writeApproveTips(desc string, oldTips approveTips) error {
 	}
 
 	if oldTips.exists() {
-		return rs.c.UpdatePRComment(rs.org, rs.repo, oldTips.tipsID, desc)
+		rs.c.DeletePRComment(rs.org, rs.repo, oldTips.tipsID)
 	}
 	return rs.c.CreatePRComment(rs.org, rs.repo, rs.prNumber, desc)
 }

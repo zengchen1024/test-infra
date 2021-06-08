@@ -12,29 +12,29 @@ import (
 )
 
 type reviewerHelper struct {
+	org      string
+	repo     string
+	prAuthor string
+	prNumber int
+
 	c   ghclient
-	roc repoowners.Interface
+	roc repoowners.RepoOwner
 	log *logrus.Entry
 	cfg reviewerConfig
 }
 
-func (r reviewerHelper) suggestReviewers(org, repo, branch, prAuthor string, prNumber int) ([]string, error) {
-	oc, err := r.roc.LoadRepoOwners(org, repo, branch)
-	if err != nil {
-		return nil, fmt.Errorf("error loading RepoOwners: %v", err)
-	}
-
-	changes, err := r.c.getPullRequestChanges(org, repo, prNumber)
+func (r reviewerHelper) suggestReviewers() ([]string, error) {
+	changes, err := r.c.getPullRequestChanges(r.org, r.repo, r.prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("error getting PR changes: %v", err)
 	}
 
 	reviewerCount := r.cfg.ReviewerCount
-	excludedReviewers := sets.NewString(prAuthor)
-	reviewers := r.getReviewers(oc, changes, reviewerCount, excludedReviewers)
+	excludedReviewers := sets.NewString(r.prAuthor)
+	reviewers := r.getReviewers(r.roc, changes, reviewerCount, excludedReviewers)
 	if len(reviewers) < reviewerCount && !r.cfg.ExcludeApprovers {
 		approvers := r.getReviewers(
-			fallbackReviewersClient{oc: oc},
+			fallbackReviewersClient{oc: r.roc},
 			changes, reviewerCount-len(reviewers),
 			excludedReviewers.Insert(reviewers...),
 		)

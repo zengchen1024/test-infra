@@ -20,6 +20,7 @@ type giteeClient interface {
 	DeletePRComment(org, repo string, ID int) error
 	UpdatePRComment(org, repo string, commentID int, comment string) error
 	GetPullRequestChanges(org, repo string, number int) ([]github.PullRequestChange, error)
+	ListCollaborators(org, repo string) ([]github.User, error)
 }
 
 type ghclient struct {
@@ -63,6 +64,19 @@ func (c ghclient) getPullRequestChanges(org, repo string, number int) ([]string,
 			m[dir] = true
 			r = append(r, filename)
 		}
+	}
+	return r, nil
+}
+
+func (c ghclient) listCollaborators(org, repo string) ([]string, error) {
+	cs, err := c.ListCollaborators(org, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	r := make([]string, 0, len(cs))
+	for i := range cs {
+		r = append(r, github.NormLogin(cs[i].Login))
 	}
 	return r, nil
 }

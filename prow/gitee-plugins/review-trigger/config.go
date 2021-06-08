@@ -16,6 +16,10 @@ type confTrigger struct {
 	Trigger      []pluginConfig `json:"trigger,omitempty"`
 }
 
+func (c confTrigger) commandsLink(org, repo string) string {
+	return fmt.Sprintf("%s%s%%2F%s", c.CommandsLink, org, repo)
+}
+
 func (c *configuration) Validate() error {
 	if c.Trigger == nil {
 		return nil
@@ -159,6 +163,10 @@ type pluginConfig struct {
 	runningStatusOfJob string
 
 	Reviewers reviewerConfig `json:"reviewers"`
+
+	// BranchWithoutOwners is a list of branches which have no OWNERS file
+	// For these branch, collaborators will be work as the approvers
+	BranchWithoutOwners []string `json:"branch_without_owners"`
 }
 
 func (p pluginConfig) labelsForCI() []string {
@@ -178,4 +186,13 @@ func (p pluginConfig) statusToLabel(status string) string {
 		l = p.LabelForCIFailed
 	}
 	return l
+}
+
+func (p pluginConfig) isBranchWithoutOwners(branch string) bool {
+	for _, i := range p.BranchWithoutOwners {
+		if i == branch {
+			return true
+		}
+	}
+	return false
 }
