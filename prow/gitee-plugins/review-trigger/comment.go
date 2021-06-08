@@ -95,7 +95,7 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, log *logrus.Entry) 
 		cfg, _ := rt.pluginConfig()
 		s := fmt.Sprintf(
 			"You can't use command of `/%s`. Please see the [*command usage*](%s) to get detail",
-			strings.ToLower(invalidCmd), cfg.Trigger.CommandsLink,
+			strings.ToLower(invalidCmd), cfg.Trigger.commandsLink(rs.org, rs.repo),
 		)
 		rt.client.CreatePRComment(
 			rs.org, rs.repo, rs.prNumber,
@@ -103,6 +103,10 @@ func (rt *trigger) handleReviewComment(ne gitee.PRNoteEvent, log *logrus.Entry) 
 		)
 	}
 	if cmd == "" || !rs.isReviewer(commenter) {
+		log.Infof(
+			"It can't handle note event, because cmd(%s) is empty or commenter(%s) is not a reviewer. There are %d reviewers.",
+			cmd, commenter, len(rs.reviewers),
+		)
 		return nil
 	}
 

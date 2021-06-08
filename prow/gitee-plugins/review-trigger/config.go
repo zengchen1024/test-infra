@@ -16,6 +16,10 @@ type confTrigger struct {
 	Trigger      []pluginConfig `json:"trigger,omitempty"`
 }
 
+func (c confTrigger) commandsLink(org, repo string) string {
+	return fmt.Sprintf("%s%s%%2F%s", c.CommandsLink, org, repo)
+}
+
 func (c *configuration) Validate() error {
 	if c.Trigger == nil {
 		return nil

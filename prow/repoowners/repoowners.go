@@ -890,7 +890,7 @@ func NewRepoOwners(p []string, log *logrus.Entry) RepoOwner {
 	return &RepoOwners{
 		log: log,
 		approvers: map[string]map[*regexp.Regexp]sets.String{
-			ownersFileName: {nil: sets.NewString(p...)},
+			canonicalize("."): {nil: sets.NewString(p...)},
 		},
 	}
 }
