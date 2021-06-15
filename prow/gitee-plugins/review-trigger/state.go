@@ -226,7 +226,80 @@ func (rs reviewState) isReviewer(author string) bool {
 	return rs.reviewers.Has(author)
 }
 
+func (rs reviewState) isAllFilesApproved(as []string) bool {
+	m := map[string]bool{}
+	for _, a := range as {
+		d, ok := rs.approverDirMap[a]
+		if !ok {
+			continue
+		}
+
+		for i := range d {
+			if !m[i] {
+				m[i] = true
+			}
+		}
+	}
+	return len(m) == len(rs.filenames)
+}
+
+func (rs reviewState) selectApprovers(as []string, n int) []string {
+	excluded := map[string]bool{}
+	for _, a := range as {
+		excluded[a] = true
+	}
+
+	if !rs.cfg.AllowSelfApprove {
+		excluded[rs.prAuthor] = true
+	}
+
+	r := make([]string, 0, n)
+	for _, f := range rs.filenames {
+		p, ok := rs.dirApproverMap[f]
+		if !ok {
+			continue
+		}
+
+		for i := range p {
+			if !excluded[i] {
+				r = append(r, i)
+				if n--; n == 0 {
+					return r
+				}
+			}
+		}
+	}
+	return r
+}
+
+func (rs reviewState) suggestApproverOfMiddleLevel(currentApprovers []string) []string {
+	f := func(suggested []string) []string {
+		n := rs.cfg.TotalNumberOfApprovers - len(currentApprovers) - len(suggested)
+		if n <= 0 {
+			return suggested
+		}
+		v := rs.selectApprovers(mergeSlices(currentApprovers, suggested), n)
+		v = append(v, suggested...)
+		return v
+	}
+
+	as := mergeSlices(currentApprovers, rs.assignees)
+	if rs.isAllFilesApproved(as) {
+		return f(rs.assignees)
+	}
+
+	return f(rs.suggestApproverByNumber(currentApprovers))
+}
+
 func (rs reviewState) suggestApprover(currentApprovers []string) []string {
+	if rs.cfg.MiddleLevel {
+		return rs.suggestApproverOfMiddleLevel(currentApprovers)
+	}
+
+	return rs.suggestApproverByNumber(currentApprovers)
+}
+
+func (rs reviewState) suggestApproverByNumber(currentApprovers []string) []string {
 	ah := approverHelper{
 		currentApprovers:  currentApprovers,
 		assignees:         rs.assignees,
@@ -239,4 +312,12 @@ func (rs reviewState) suggestApprover(currentApprovers []string) []string {
 		log:               rs.log,
 	}
 	return ah.suggestApprovers()
+}
+
+func mergeSlices(s []string, s1 []string) []string {
+	n := len(s) + len(s1)
+	r := make([]string, 0, n)
+	r = append(r, s...)
+	r = append(r, s1...)
+	return r
 }

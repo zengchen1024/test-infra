@@ -66,6 +66,10 @@ func (c *configuration) SetDefault() {
 			item.NumberOfApprovers = 1
 		}
 
+		if item.TotalNumberOfApprovers <= 0 {
+			item.TotalNumberOfApprovers = 2
+		}
+
 		item.runningStatusOfJob = "running"
 		if item.Reviewers.ReviewerCount == 0 {
 			item.Reviewers.ReviewerCount = 2
@@ -123,6 +127,15 @@ type pluginConfig struct {
 	// NumberOfApprovers is the min number of approvers who commented
 	// /approve at same time to merge the single module
 	NumberOfApprovers int `json:"number_of_approvers"`
+
+	// TotalNumberOfApprovers is the min number of approvers who commented
+	// /approve at same time to merge the PR
+	TotalNumberOfApprovers int `json:"total_number_of_approvers"`
+
+	// MiddleLevel is one of levels which stand for the strictness of review level.
+	// The corresponding algorithm will be used to infer label of PR and find the
+	// candidate of approvers. The level can be `simple`, `middle` and `strict`.
+	MiddleLevel bool `json:"middle_level"`
 
 	// TitleOfCITable is the title of ci comment for pr. The format of comment
 	// must have 2 or more columns, and the second column must be job result.
