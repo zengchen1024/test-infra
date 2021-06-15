@@ -263,7 +263,7 @@ func (rs reviewState) selectApprovers(as []string, n int) []string {
 		for i := range p {
 			if !excluded[i] {
 				r = append(r, i)
-				if n--; n == 0 {
+				if len(r) >= n {
 					return r
 				}
 			}
@@ -315,8 +315,7 @@ func (rs reviewState) suggestApproverByNumber(currentApprovers []string) []strin
 }
 
 func mergeSlices(s []string, s1 []string) []string {
-	n := len(s) + len(s1)
-	r := make([]string, 0, n)
+	r := make([]string, 0, len(s)+len(s1))
 	r = append(r, s...)
 	r = append(r, s1...)
 	return r
