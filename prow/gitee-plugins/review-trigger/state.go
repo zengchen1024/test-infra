@@ -226,7 +226,104 @@ func (rs reviewState) isReviewer(author string) bool {
 	return rs.reviewers.Has(author)
 }
 
+func (rs reviewState) isAllFilesApproved(as []string) bool {
+	m := map[string]bool{}
+	for _, a := range as {
+		d, ok := rs.approverDirMap[a]
+		if !ok {
+			continue
+		}
+
+		for i := range d {
+			if !m[i] {
+				m[i] = true
+			}
+		}
+	}
+	return len(m) == len(rs.filenames)
+}
+
+func (rs reviewState) selectApprovers(as []string, n int) []string {
+	excluded := map[string]bool{}
+	for _, a := range as {
+		excluded[a] = true
+	}
+
+	if !rs.cfg.AllowSelfApprove {
+		excluded[rs.prAuthor] = true
+	}
+
+	r := make([]string, 0, n)
+	done := func() bool {
+		return len(r) >= n
+	}
+
+	find := func(getCandidates func(string) sets.String) {
+		for _, f := range rs.filenames {
+			for i := range getCandidates(f) {
+				if !excluded[i] {
+					r = append(r, i)
+					if done() {
+						break
+					}
+					excluded[i] = true
+				}
+			}
+			if done() {
+				break
+			}
+		}
+	}
+
+	find(rs.owner.LeafApprovers)
+	if !done() {
+		find(func(p string) sets.String {
+			if v, ok := rs.dirApproverMap[p]; ok {
+				return v
+			}
+			return sets.NewString()
+		})
+	}
+	return r
+}
+
+func (rs reviewState) suggestApproverOfMiddleLevel(currentApprovers []string) []string {
+	f := func(suggested []string) []string {
+		n := rs.cfg.TotalNumberOfApprovers - len(currentApprovers) - len(suggested)
+		if n <= 0 {
+			return suggested
+		}
+		v := rs.selectApprovers(mergeSlices(currentApprovers, suggested), n)
+		v = append(v, suggested...)
+		return v
+	}
+
+	as := mergeSlices(currentApprovers, rs.assignees)
+	if rs.isAllFilesApproved(as) {
+		if len(rs.assignees) > 0 {
+			suggested := make([]string, 0, len(rs.assignees))
+			for _, i := range rs.assignees {
+				if rs.isApprover(i) {
+					suggested = append(suggested, i)
+				}
+			}
+			return f(difference(suggested, currentApprovers))
+		}
+		return f([]string{})
+	}
+
+	return f(rs.suggestApproverByNumber(currentApprovers))
+}
+
 func (rs reviewState) suggestApprover(currentApprovers []string) []string {
+	if rs.cfg.MiddleLevel {
+		return rs.suggestApproverOfMiddleLevel(currentApprovers)
+	}
+
+	return rs.suggestApproverByNumber(currentApprovers)
+}
+
+func (rs reviewState) suggestApproverByNumber(currentApprovers []string) []string {
 	ah := approverHelper{
 		currentApprovers:  currentApprovers,
 		assignees:         rs.assignees,
@@ -239,4 +336,20 @@ func (rs reviewState) suggestApprover(currentApprovers []string) []string {
 		log:               rs.log,
 	}
 	return ah.suggestApprovers()
+}
+
+func mergeSlices(s []string, s1 []string) []string {
+	r := make([]string, 0, len(s)+len(s1))
+	r = append(r, s...)
+	r = append(r, s1...)
+	return r
+}
+
+func difference(s, s1 []string) []string {
+	if len(s) == 0 || len(s1) == 0 {
+		return s
+	}
+	return sets.NewString(s...).Difference(
+		sets.NewString(s1...),
+	).List()
 }

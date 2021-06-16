@@ -157,6 +157,17 @@ func (rs reviewState) getCommands(c *sComment) (string, string) {
 }
 
 func (rs reviewState) applyComments(comments []*sComment) string {
+	label := rs.calcLabel(comments)
+
+	if label == labelApproved && rs.cfg.MiddleLevel {
+		if as, _ := statOnesWhoAgreed(comments); len(as) < rs.cfg.TotalNumberOfApprovers {
+			return labelLGTM
+		}
+	}
+	return label
+}
+
+func (rs reviewState) calcLabel(comments []*sComment) string {
 	records := map[string]*record{}
 	for dir := range rs.dirApproverMap {
 		v := record{}
