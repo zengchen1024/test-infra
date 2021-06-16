@@ -254,20 +254,36 @@ func (rs reviewState) selectApprovers(as []string, n int) []string {
 	}
 
 	r := make([]string, 0, n)
-	for _, f := range rs.filenames {
-		p, ok := rs.dirApproverMap[f]
-		if !ok {
-			continue
-		}
+	done := func() bool {
+		return len(r) >= n
+	}
 
-		for i := range p {
-			if !excluded[i] {
-				r = append(r, i)
-				if len(r) >= n {
-					return r
+	find := func(getCandidates func(string) sets.String) {
+		for _, f := range rs.filenames {
+			for i := range getCandidates(f) {
+				if !excluded[i] {
+					r = append(r, i)
+					if done() {
+						break
+					}
+					excluded[i] = true
 				}
 			}
+			if done() {
+				break
+			}
 		}
+	}
+
+	find(rs.owner.LeafApprovers)
+	if !done() {
+		find(func(p string) sets.String {
+			v, ok := rs.dirApproverMap[p]
+			if !ok {
+				return sets.NewString()
+			}
+			return v
+		})
 	}
 	return r
 }
@@ -285,7 +301,7 @@ func (rs reviewState) suggestApproverOfMiddleLevel(currentApprovers []string) []
 
 	as := mergeSlices(currentApprovers, rs.assignees)
 	if rs.isAllFilesApproved(as) {
-		return f(rs.assignees)
+		return f(difference(rs.assignees, currentApprovers))
 	}
 
 	return f(rs.suggestApproverByNumber(currentApprovers))
@@ -319,4 +335,24 @@ func mergeSlices(s []string, s1 []string) []string {
 	r = append(r, s...)
 	r = append(r, s1...)
 	return r
+}
+
+func difference(s, s1 []string) []string {
+	if len(s) <= 0 {
+		return s
+	}
+
+	m := map[string]bool{}
+	for _, i := range s1 {
+		m[i] = true
+	}
+
+	v := make([]string, 0, len(s))
+	for _, i := range s {
+		if !m[i] {
+			v = append(v, i)
+		}
+	}
+
+	return v
 }
