@@ -300,7 +300,16 @@ func (rs reviewState) suggestApproverOfMiddleLevel(currentApprovers []string) []
 
 	as := mergeSlices(currentApprovers, rs.assignees)
 	if rs.isAllFilesApproved(as) {
-		return f(difference(rs.assignees, currentApprovers))
+		if len(rs.assignees) > 0 {
+			suggested := make([]string, 0, len(rs.assignees))
+			for _, i := range rs.assignees {
+				if rs.isApprover(i) {
+					suggested = append(suggested, i)
+				}
+			}
+			return f(difference(suggested, currentApprovers))
+		}
+		return f([]string{})
 	}
 
 	return f(rs.suggestApproverByNumber(currentApprovers))
