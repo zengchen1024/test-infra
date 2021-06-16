@@ -278,11 +278,10 @@ func (rs reviewState) selectApprovers(as []string, n int) []string {
 	find(rs.owner.LeafApprovers)
 	if !done() {
 		find(func(p string) sets.String {
-			v, ok := rs.dirApproverMap[p]
-			if !ok {
-				return sets.NewString()
+			if v, ok := rs.dirApproverMap[p]; ok {
+				return v
 			}
-			return v
+			return sets.NewString()
 		})
 	}
 	return r
@@ -338,21 +337,10 @@ func mergeSlices(s []string, s1 []string) []string {
 }
 
 func difference(s, s1 []string) []string {
-	if len(s) <= 0 {
+	if len(s) == 0 || len(s1) == 0 {
 		return s
 	}
-
-	m := map[string]bool{}
-	for _, i := range s1 {
-		m[i] = true
-	}
-
-	v := make([]string, 0, len(s))
-	for _, i := range s {
-		if !m[i] {
-			v = append(v, i)
-		}
-	}
-
-	return v
+	return sets.NewString(s...).Difference(
+		sets.NewString(s1...),
+	).List()
 }
