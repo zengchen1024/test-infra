@@ -86,6 +86,10 @@ func (rt *trigger) handleCIStatusComment(ne gitee.PRNoteEvent, log *logrus.Entry
 		return err
 	}
 
+	if cfg.NoCI {
+		return nil
+	}
+
 	status := parseCIStatus(cfg, ne.GetComment())
 	if status == "" {
 		return nil
