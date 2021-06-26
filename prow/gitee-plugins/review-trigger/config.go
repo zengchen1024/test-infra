@@ -32,35 +32,8 @@ func (c *configuration) Validate() error {
 
 	t := c.Trigger.Trigger
 	for i := range t {
-		item := &t[i]
-
-		if _, err := parseJobComment(item.TitleOfCITable); err != nil {
-			return fmt.Errorf("the format of `title_of_ci_table` is not correct")
-		}
-
-		if item.EnableLabelForCI {
-			m := map[string]string{
-				"label_for_ci_failed":  item.LabelForCIFailed,
-				"label_for_ci_running": item.LabelForCIRunning,
-			}
-
-			for k, v := range m {
-				if v == "" {
-					return fmt.Errorf("`%s` must be set when adding label for ci status is enabled", k)
-				}
-			}
-		}
-
-		if len(item.BranchWithOwners) > 0 && item.BranchWithoutOwners != "" {
-			return fmt.Errorf("both `branch_with_owners` and `branch_without_owners` can not be set at same time")
-		}
-
-		if item.BranchWithoutOwners != "" {
-			r, err := regexp.Compile(item.BranchWithoutOwners)
-			if err != nil {
-				return fmt.Errorf("the value of `branch_without_owners` is not a valid regexp, err:%v", err)
-			}
-			item.reBranchWithoutOwners = r
+		if err := (&t[i]).validate(); err != nil {
+			return err
 		}
 	}
 
@@ -157,6 +130,10 @@ type pluginConfig struct {
 	// candidate of approvers. The level can be `simple`, `middle` and `strict`.
 	MiddleLevel bool `json:"middle_level"`
 
+	// NoCI is the tag which indicates the repo is not set CI.
+	// It can't be set with EnableLabelForCI at same time
+	NoCI bool `json:"no_ci"`
+
 	// TitleOfCITable is the title of ci comment for pr. The format of comment
 	// must have 2 or more columns, and the second column must be job result.
 	//
@@ -165,19 +142,20 @@ type pluginConfig struct {
 	//
 	// The value of TitleOfCITable for ci comment above is
 	// `| job name | result | detail |`
-	TitleOfCITable string `json:"title_of_ci_table" required:"true"`
+	TitleOfCITable string `json:"title_of_ci_table"`
 
 	// NumberOfTestCases is the number of test cases for PR
-	NumberOfTestCases int `json:"number_of_test_cases" required:"true"`
+	NumberOfTestCases int `json:"number_of_test_cases"`
 
 	// EnableLabelForCI is the tag which indicates whether enables
 	// function to add ci status label for PR. If is true, the labels
 	// which stand for running and fail must be set.
+	// It can't be set with NoCI at same time
 	EnableLabelForCI bool `json:"enable_label_for_ci"`
 
 	// LabelForCIPassed is the label name for org/repos indicating
 	// the CI test cases have passed
-	LabelForCIPassed string `json:"label_for_ci_passed" required:"true"`
+	LabelForCIPassed string `json:"label_for_ci_passed"`
 
 	// LabelForCIFailed is the label name for org/repos indicating
 	// the CI test cases have failed
@@ -188,10 +166,10 @@ type pluginConfig struct {
 	LabelForCIRunning string `json:"label_for_ci_running"`
 
 	// SuccessStatusOfJob is the status desc when a single job is successful
-	SuccessStatusOfJob string `json:"success_status_of_job" required:"true"`
+	SuccessStatusOfJob string `json:"success_status_of_job"`
 
 	// FailureStatusOfJob is the status desc when a single job is failed
-	FailureStatusOfJob string `json:"failure_status_of_job" required:"true"`
+	FailureStatusOfJob string `json:"failure_status_of_job"`
 
 	runningStatusOfJob string
 
@@ -233,4 +211,74 @@ func (p pluginConfig) isBranchWithoutOwners(branch string) bool {
 	}
 
 	return p.reBranchWithoutOwners != nil && p.reBranchWithoutOwners.MatchString(branch)
+}
+
+func (p *pluginConfig) validate() error {
+	formatError := func(err error) error {
+		return fmt.Errorf("Error for config of repo:%s, %v", p.Repos[0], err)
+	}
+
+	checkString := func(items map[string]bool, msg string) error {
+		for k, v := range items {
+			if !v {
+				return fmt.Errorf("`%s` %s", k, msg)
+			}
+		}
+		return nil
+	}
+
+	validStr := func(s string) bool {
+		return s != ""
+	}
+
+	if !p.NoCI {
+		err := checkString(
+			map[string]bool{
+				"title_of_ci_table":     validStr(p.TitleOfCITable),
+				"label_for_ci_passed":   validStr(p.LabelForCIPassed),
+				"success_status_of_job": validStr(p.SuccessStatusOfJob),
+				"failure_status_of_job": validStr(p.FailureStatusOfJob),
+				"number_of_test_cases":  p.NumberOfTestCases > 0,
+			},
+			"must be set when CI is set for repo",
+		)
+		if err != nil {
+			return formatError(err)
+		}
+
+		if _, err := parseJobComment(p.TitleOfCITable); err != nil {
+			return formatError(fmt.Errorf("the format of `title_of_ci_table` is not correct"))
+		}
+	}
+
+	if p.EnableLabelForCI {
+		if p.NoCI {
+			return formatError(fmt.Errorf("both `enable_label_for_ci` and `no_ci` can not be set at same time"))
+		}
+
+		err := checkString(
+			map[string]bool{
+				"label_for_ci_failed":  validStr(p.LabelForCIFailed),
+				"label_for_ci_running": validStr(p.LabelForCIRunning),
+			},
+			"must be set when adding label for ci status is enabled",
+		)
+		if err != nil {
+			return formatError(err)
+		}
+	}
+
+	if len(p.BranchWithOwners) > 0 && p.BranchWithoutOwners != "" {
+		return formatError(fmt.Errorf("both `branch_with_owners` and `branch_without_owners` can not be set at same time"))
+	}
+
+	if p.BranchWithoutOwners != "" {
+		r, err := regexp.Compile(p.BranchWithoutOwners)
+		if err != nil {
+			return formatError(fmt.Errorf("the value of `branch_without_owners` is not a valid regexp, err:%v", err))
+		}
+		p.reBranchWithoutOwners = r
+	}
+
+	return nil
 }

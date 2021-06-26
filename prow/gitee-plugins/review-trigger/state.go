@@ -73,7 +73,7 @@ func (rs reviewState) applyLGTM(cls map[string]bool, reviewComments []*sComment,
 
 	approvers, reviewers := statOnesWhoAgreed(reviewComments)
 	var sa []string
-	if isCIPassed || cls[rs.cfg.LabelForCIPassed] {
+	if rs.cfg.NoCI || isCIPassed || cls[rs.cfg.LabelForCIPassed] {
 		if !oldTips.exists() || !doesTipsHasPart2(oldTips.body) || latestComment == cmdAPPROVE {
 			sa = rs.suggestApprover(approvers)
 		}
