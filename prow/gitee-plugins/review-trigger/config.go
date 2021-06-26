@@ -2,6 +2,7 @@ package reviewtrigger
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/huaweicloud/golangsdk"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,6 +50,18 @@ func (c *configuration) Validate() error {
 				}
 			}
 		}
+
+		if len(item.BranchWithOwners) > 0 && item.BranchWithoutOwners != "" {
+			return fmt.Errorf("both `branch_with_owners` and `branch_without_owners` can not be set at same time")
+		}
+
+		if item.BranchWithoutOwners != "" {
+			r, err := regexp.Compile(item.BranchWithoutOwners)
+			if err != nil {
+				return fmt.Errorf("the value of `branch_without_owners` is not a valid regexp, err:%v", err)
+			}
+			item.reBranchWithoutOwners = r
+		}
 	}
 
 	return nil
@@ -88,6 +101,10 @@ func (c *configuration) TriggerFor(org, repo string) *pluginConfig {
 	for i := range t {
 		item := &(t[i])
 
+		if sets.NewString(item.ExcludedRepos...).Has(fullName) {
+			continue
+		}
+
 		s := sets.NewString(item.Repos...)
 		if s.Has(fullName) {
 			return item
@@ -119,6 +136,9 @@ type reviewerConfig struct {
 type pluginConfig struct {
 	// Repos is either of the form org/repos or just org.
 	Repos []string `json:"repos" required:"true"`
+
+	// ExcludedRepos has the form of org/repo.
+	ExcludedRepos []string `json:"excluded_repos,omitempty"`
 
 	// AllowSelfApprove is the tag which indicate if the author
 	// can appove his/her own pull-request.
@@ -179,7 +199,13 @@ type pluginConfig struct {
 
 	// BranchWithoutOwners is a list of branches which have no OWNERS file
 	// For these branch, collaborators will be work as the approvers
-	BranchWithoutOwners []string `json:"branch_without_owners"`
+	// It can't be set with BranchWithOwners at same time
+	BranchWithoutOwners   string `json:"branch_without_owners"`
+	reBranchWithoutOwners *regexp.Regexp
+
+	// BranchWithOwners is a list of branches which have OWNERS file
+	// It can't be set with BranchWithoutOwners at same time
+	BranchWithOwners []string `json:"branch_with_owners"`
 }
 
 func (p pluginConfig) labelsForCI() []string {
@@ -202,10 +228,9 @@ func (p pluginConfig) statusToLabel(status string) string {
 }
 
 func (p pluginConfig) isBranchWithoutOwners(branch string) bool {
-	for _, i := range p.BranchWithoutOwners {
-		if i == branch {
-			return true
-		}
+	if len(p.BranchWithOwners) > 0 {
+		return !sets.NewString(p.BranchWithOwners...).Has(branch)
 	}
-	return false
+
+	return p.reBranchWithoutOwners != nil && p.reBranchWithoutOwners.MatchString(branch)
 }
