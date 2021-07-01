@@ -189,44 +189,46 @@ func (cl *cla) pluginConfig() (*configuration, error) {
 }
 
 func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) (string, bool, error) {
-	cos := map[string]*sdk.PullRequestCommits{}
 	commits, err := cl.ghc.GetCommits(org, repo, number)
 	if err != nil {
 		return "", false, err
 	}
+	if len(commits) == 0 {
+		return "", false, fmt.Errorf("commits is empty, cla cannot be checked")
+	}
+
+	result := map[string]bool{}
+	unsigned := make([]*sdk.PullRequestCommits, len(commits))
 	for i := range commits {
-		v := &commits[i]
-		if v.Commit == nil || v.Commit.Author == nil {
+		c := &commits[i]
+		if c.Commit == nil || c.Commit.Author == nil {
 			continue
 		}
-		email := plugins.NormalEmail(v.Commit.Author.Email)
-		if _, ok := cos[email]; !ok {
-			cos[email] = v
-		}
-	}
-	unSigns, signed, err := checkCommitsSigned(cos, checkURL)
-	if err != nil {
-		return "", signed, err
-	}
-	comment := generateUnSignComment(unSigns, cos)
-	return comment, signed, err
-}
 
-func checkCommitsSigned(commits map[string]*sdk.PullRequestCommits, checkURL string) ([]string, bool, error) {
-	if len(commits) == 0 {
-		return nil, false, fmt.Errorf("commits is empty, cla cannot be checked")
-	}
-	var unCheck []string
-	for k := range commits {
-		signed, err := isSigned(k, checkURL)
+		email := plugins.NormalEmail(c.Commit.Author.Email)
+		if email == "" {
+			unsigned = append(unsigned, c)
+			continue
+		}
+
+		if v, ok := result[email]; ok {
+			if !v {
+				unsigned = append(unsigned, c)
+			}
+			continue
+		}
+
+		b, err := isSigned(email, checkURL)
 		if err != nil {
-			return unCheck, false, err
+			return "", false, err
 		}
-		if !signed {
-			unCheck = append(unCheck, k)
+		result[email] = b
+		if !b {
+			unsigned = append(unsigned, c)
 		}
 	}
-	return unCheck, len(unCheck) == 0, nil
+
+	return generateUnSignComment(unsigned), len(unsigned) == 0, nil
 }
 
 func isSigned(email, url string) (bool, error) {
@@ -259,20 +261,19 @@ func isSigned(email, url string) (bool, error) {
 	return v.Data.Signed, nil
 }
 
-func generateUnSignComment(unSigns []string, commits map[string]*sdk.PullRequestCommits) string {
-	if len(unSigns) == 1 {
-		return fmt.Sprintf("The author(**%s**) need to sign cla.", commits[unSigns[0]].Commit.Author.Name)
+func generateUnSignComment(commits []*sdk.PullRequestCommits) string {
+	if len(commits) == 0 {
+		return ""
 	}
-	cs := make([]string, 0, len(unSigns))
-	for _, v := range unSigns {
-		com := commits[v]
+
+	cs := make([]string, 0, len(commits))
+	for _, c := range commits {
 		cs = append(cs, fmt.Sprintf(
-			"The author(**%s**) of commit [%s](%s) need to sign cla.",
-			com.Commit.Author.Name, com.Sha[:8], com.HtmlUrl,
+			"%s | %s", headOfSHA(c.Sha), c.Commit.Message,
 		))
 	}
-	return strings.Join(cs, "\n")
 
+	return fmt.Sprintf("The following commits have not yet signed CLA.\n%s", strings.Join(cs, "\n"))
 }
 
 func deleteSignGuide(org, repo string, number int, c giteeClient) {
@@ -318,4 +319,11 @@ It may take a couple minutes for the CLA signature to be fully registered; after
 func alreadySigned(user string) string {
 	s := `***@%s***, Thanks for your pull request. All the authors of commits have finished signinig CLA successfully. :wave: `
 	return fmt.Sprintf(s, user)
+}
+
+func headOfSHA(sha string) string {
+	if len(sha) <= 8 {
+		return sha
+	}
+	return sha[:8]
 }
