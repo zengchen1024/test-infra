@@ -17,7 +17,15 @@ PR中某个commit的作者的邮箱见下图。
 
 ![commit-author-email](commit_author_email.png)
 
-## 怎么修改commit作者的邮箱
+## 当某个commit作者的邮箱未签署CLA怎么处理
+
+   1. 使用该邮箱签署CLA
+
+   2. 如果该邮箱签署的是员工CLA，请确保该邮箱已经被所属企业的CLA管理员激活
+
+   3. 如果该commit的邮箱设置错误，请参考[下一节](#amend_email)的方法处理
+
+## 怎么修改commit作者的邮箱<a id="amend_email"/>
 
    step1: 运行如下命令进入交互式界面，需要替换参数 **n** 。在界面中选择需要修改的commit，将pick 改为 edit，之后按界面提示保存设置并退出
 
