@@ -9,7 +9,7 @@ description: |
 
 机器人是通过检查PullRequest中**所有commit**作者的邮箱是否都签署了CLA来判定PR是否完成了CLA签署
 
-## 怎么查看PR的commit作者的邮箱
+## 怎么查看PR所有commit的作者的邮箱
 
 请访问这个[网页](https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoPullsNumberCommits)，输入pr信息进行查看
 
@@ -32,5 +32,7 @@ description: |
 在开发前请按如下方式配置git。这里的邮箱必须是已经签署过CLA
 
 ```sh
+git config user.name [gitee id]
+
 git config user.email example@xx.com
 ```
