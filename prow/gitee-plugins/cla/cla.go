@@ -121,7 +121,7 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 		return err
 	}
 
-	cInf, signed, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
+	unsigned, err := cl.getPrCommitsAbout(org, repo, prNumber, cfg.CheckURL)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 	hasCLAYes := currentLabes[cfg.CLALabelYes]
 	hasCLANo := currentLabes[cfg.CLALabelNo]
 
-	if signed {
+	if len(unsigned) == 0 {
 		if hasCLANo {
 			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
 				log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelNo)
@@ -144,6 +144,7 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 		}
 		return nil
 	}
+
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 			log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelYes)
@@ -157,7 +158,11 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 	}
 
 	deleteSignGuide(org, repo, prNumber, cl.ghc.giteeClient)
-	return cl.ghc.CreateComment(org, repo, prNumber, signGuide(cfg.SignURL, "gitee", cInf))
+
+	return cl.ghc.CreateComment(
+		org, repo, prNumber,
+		signGuide(cfg.SignURL, "gitee", generateUnSignComment(unsigned)),
+	)
 }
 
 func (cl *cla) orgRepoConfig(org, repo string) (*pluginConfig, error) {
@@ -188,17 +193,17 @@ func (cl *cla) pluginConfig() (*configuration, error) {
 	return c1, nil
 }
 
-func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) (string, bool, error) {
+func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) ([]*sdk.PullRequestCommits, error) {
 	commits, err := cl.ghc.GetCommits(org, repo, number)
 	if err != nil {
-		return "", false, err
+		return nil, err
 	}
 	if len(commits) == 0 {
-		return "", false, fmt.Errorf("commits is empty, cla cannot be checked")
+		return nil, fmt.Errorf("commits is empty, cla cannot be checked")
 	}
 
 	result := map[string]bool{}
-	unsigned := make([]*sdk.PullRequestCommits, len(commits))
+	unsigned := make([]*sdk.PullRequestCommits, 0, len(commits))
 	for i := range commits {
 		c := &commits[i]
 		if c.Commit == nil || c.Commit.Author == nil {
@@ -220,7 +225,7 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 
 		b, err := isSigned(email, checkURL)
 		if err != nil {
-			return "", false, err
+			return nil, err
 		}
 		result[email] = b
 		if !b {
@@ -228,7 +233,7 @@ func (cl *cla) getPrCommitsAbout(org, repo string, number int, checkURL string) 
 		}
 	}
 
-	return generateUnSignComment(unsigned), len(unsigned) == 0, nil
+	return unsigned, nil
 }
 
 func isSigned(email, url string) (bool, error) {
