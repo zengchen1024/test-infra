@@ -2,55 +2,30 @@
 title: "Sign CLA"
 weight: 6
 description: |
-  An overview of how to sign CLA.
+  An overview about CLA.
 ---
 
-## 常见的问题
+## 机器人是怎么检查PR是否签署了CLA的
 
+机器人是通过检查PullRequest中**所有commit**作者的邮箱是否都签署了CLA来判定PR是否完成了CLA签署
 
-### 怎么设置本地开发环境
+## 怎么查看PR所有commit的作者的邮箱
 
-在开发前请按如下方式配置git。这里的邮箱必须是已经签署过CLA
+请访问这个[网页](https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoPullsNumberCommits)，输入pr信息进行查看
 
-```sh
-git config user.email example@xx.com
-```
+PR中某个commit的作者的邮箱见下图。
 
+![commit-author-email](commit_author_email.png)
 
-### 如果需要签署CLA，请先按下图所示配置Gitee的提交邮箱，之后再签署
+## 当某个commit作者的邮箱未签署CLA怎么处理
 
-![gitee_email](gitee_email.png)
+   1. 使用该邮箱签署CLA
 
+   2. 如果该邮箱签署的是员工CLA，请确保该邮箱已经被所属企业的CLA管理员激活
 
-### 机器人提示未签署CLA，去签署又提示已签署
+   3. 如果该commit的邮箱设置错误，请参考[下一节](#amend_email)的方法处理
 
-机器人是通过检查PullRequest中所有commit的作者是否签署了CLA来判定PR是否完成了CLA签署
-
-此种情况请按如下步骤检查。
-
-1. 在开发环境中运行 *git log* ，查看PR涉及的每个commit的作者的邮箱
-
-```sh
-$ git log
-
-commit 6c5e70b984a60b3cecd395edd5b48a7575bf58e0
-Author: Jessica Smith <jessica@example.com>
-Date:   Sun Apr 6 10:17:23 2008 -0700
-
-   add limit to log function
-
-   Limit log functionality to the first 20
-
-```
-此commit作者的邮箱是**jessica@example.com**
-
-2. 到Gitee账号中查看已经签署过CLA的邮箱，
-
-![gitee_email](gitee_email.png)
-
-3. 如果这2个邮箱地址不一致，请选择如下任意一种方式处理
-
-   *方法 1*：
+## 怎么修改commit作者的邮箱<a id="amend_email"/>
 
    step1: 运行如下命令进入交互式界面，需要替换参数 **n** 。在界面中选择需要修改的commit，将pick 改为 edit，之后按界面提示保存设置并退出
 
@@ -59,7 +34,7 @@ Date:   Sun Apr 6 10:17:23 2008 -0700
 
    ```
 
-   step2: 运行如下命令修改commit的作者，**--author** 参数为Gitee账号中的提交邮箱地址
+   step2: 运行如下命令修改commit的作者和其邮箱, **--author** 参数指定作者(Gitee ID)和邮箱
 
    ```sh
    git commit --amend --author="Jessica Smith <email@address.com>" --no-edit
@@ -68,12 +43,18 @@ Date:   Sun Apr 6 10:17:23 2008 -0700
 
    ```
 
-   step3: 请重新提交commit，以便更新代码仓库中PR的commit信息
+   step3: 请重新提交commit，以便更新PR的commit信息
 
-   step4: 到代码仓再次执行 */check-cla* ，以便更新PR的CLA标签
+   step4: 到PR的页面评论 */check-cla* ，以便重新检查CLA
 
-   *方法 2*：
+## 开发建议
 
-   step1: 更新Gitee 账号中的提交邮箱为commit作者的邮箱，并重新签署CLA
+### 怎么设置本地开发环境
 
-   step2: 到代码仓再次执行 */check-cla* ，以便更新PR的CLA标签
+在开发前请按如下方式配置git。这里的邮箱必须是已经签署过CLA
+
+```sh
+git config user.name [gitee id]
+
+git config user.email example@xx.com
+```
