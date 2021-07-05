@@ -103,9 +103,11 @@ func (l *label) orgRepoCfg(org, repo string) (*labelCfg, error) {
 }
 
 func (l *label) handlePullRequestEvent(e *sdk.PullRequestEvent, log *logrus.Entry) error {
-	tp := plugins.ConvertPullRequestAction(e)
-	if tp == github.PullRequestActionSynchronize {
+	switch plugins.ConvertPullRequestAction(e) {
+	case github.PullRequestActionSynchronize:
 		return l.handleClearLabel(e, log)
+	case github.PullRequestActionEdited:
+		return l.handleValidatingLabel(e, log)
 	}
 	return nil
 }

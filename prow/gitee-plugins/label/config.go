@@ -24,7 +24,7 @@ type configOfValidatingLabel struct {
 	Label string `json:"label" required:"true"`
 
 	// ActiveTime is the time in hours that the label becomes invalid after it from created
-	ActiveTime int `json:"expiry_time" required:"true"`
+	ActiveTime int `json:"active_time" required:"true"`
 }
 
 func (c configOfValidatingLabel) isExpiry(t time.Time) bool {

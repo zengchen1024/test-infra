@@ -11,7 +11,13 @@ import (
 	"k8s.io/test-infra/prow/gitee"
 )
 
-func (l *label) handleValidatingLabel(e *sdk.PullRequestEvent, cfg *labelCfg, log *logrus.Entry) error {
+func (l *label) handleValidatingLabel(e *sdk.PullRequestEvent, log *logrus.Entry) error {
+	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
+	cfg, err := l.orgRepoCfg(org, repo)
+	if err != nil {
+		return err
+	}
+
 	v := cfg.LabelsToValidate
 	if len(v) == 0 {
 		return nil
@@ -29,7 +35,6 @@ func (l *label) handleValidatingLabel(e *sdk.PullRequestEvent, cfg *labelCfg, lo
 		return nil
 	}
 
-	org, repo := gitee.GetOwnerAndRepoByPREvent(e)
 	prNumber := int(e.PullRequest.Number)
 
 	ops, err := l.ghc.ListPROperationLogs(org, repo, prNumber)
