@@ -8,6 +8,7 @@ go_library(
         "config.go",
         "label.go",
         "note_handler.go",
+        "validate-label.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins/label",
     visibility = ["//visibility:public"],

@@ -35,6 +35,7 @@ type giteeClient interface {
 
 	CreatePRComment(org, repo string, number int, comment string) error
 	CreateIssueComment(org, repo string, number string, comment string) error
+	ListPROperationLogs(org, repo string, number int) ([]sdk.OperateLog, error)
 }
 
 type label struct {

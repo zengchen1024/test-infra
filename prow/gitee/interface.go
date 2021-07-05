@@ -54,6 +54,8 @@ type Client interface {
 	ReopenIssue(owner, repo string, number string) error
 	UpdateIssue(owner, number string, param sdk.IssueUpdateParam) (sdk.Issue, error)
 	GetIssueLabels(org, repo, number string) ([]sdk.Label, error)
+
+	ListPROperationLogs(org, repo string, number int) ([]sdk.OperateLog, error)
 }
 
 type ListPullRequestOpt struct {
