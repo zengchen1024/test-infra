@@ -252,6 +252,16 @@ func (c *client) ListPRComments(org, repo string, number int) ([]sdk.PullRequest
 	return r, nil
 }
 
+func (c *client) ListPROperationLogs(org, repo string, number int) ([]sdk.OperateLog, error) {
+	v, _, err := c.ac.PullRequestsApi.GetV5ReposOwnerRepoPullsNumberOperateLogs(
+		context.Background(), org, repo, int32(number), nil)
+	if err != nil {
+		return nil, formatErr(err, "list operation logs of pr")
+	}
+
+	return v, nil
+}
+
 func (c *client) ListPrIssues(org, repo string, number int32) ([]sdk.Issue, error) {
 	var issues []sdk.Issue
 	p := int32(1)
