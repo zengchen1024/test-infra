@@ -131,6 +131,8 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 	hasCLAYes := currentLabes[cfg.CLALabelYes]
 	hasCLANo := currentLabes[cfg.CLALabelNo]
 
+	deleteSignGuide(org, repo, prNumber, cl.ghc.giteeClient)
+
 	if len(unsigned) == 0 {
 		if hasCLANo {
 			if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelNo); err != nil {
@@ -146,6 +148,7 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 		}
 		return nil
 	}
+
 	if hasCLAYes {
 		if err := cl.ghc.RemoveLabel(org, repo, prNumber, cfg.CLALabelYes); err != nil {
 			log.WithError(err).Warningf("Could not remove %s label.", cfg.CLALabelYes)
@@ -157,8 +160,6 @@ func (cl *cla) handle(org, repo, prAuthor string, prNumber int, currentLabes map
 			log.WithError(err).Warningf("Could not add %s label.", cfg.CLALabelNo)
 		}
 	}
-
-	deleteSignGuide(org, repo, prNumber, cl.ghc.giteeClient)
 
 	return cl.ghc.CreateComment(
 		org, repo, prNumber,
