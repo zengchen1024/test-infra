@@ -36,7 +36,7 @@ func parseYaml(path string, r interface{}) error {
 }
 
 type RepoOwnerInfo struct {
-	dirOwners    map[string]map[*regexp.Regexp]SimpleConfig
+	dirOwners    map[string]SimpleConfig
 	fileOwners   map[string]map[*regexp.Regexp]Config
 	baseDir      string
 	dirBlacklist []*regexp.Regexp
@@ -45,12 +45,8 @@ type RepoOwnerInfo struct {
 
 var _ RepoOwner = (*RepoOwnerInfo)(nil)
 
-func (o *RepoOwnerInfo) applyDirConfigToPath(path string, re *regexp.Regexp, config *SimpleConfig) {
-	if _, ok := o.dirOwners[path]; !ok {
-		o.dirOwners[path] = make(map[*regexp.Regexp]SimpleConfig)
-	}
-
-	o.dirOwners[path][re] = SimpleConfig{
+func (o *RepoOwnerInfo) applyDirConfigToPath(path string, config *SimpleConfig) {
+	o.dirOwners[path] = SimpleConfig{
 		Config:  *normalConfig(&config.Config),
 		Options: config.Options,
 	}
@@ -83,7 +79,7 @@ func (o *RepoOwnerInfo) parseOwnerConfig(path, relPathDir string, log *logrus.En
 	}
 
 	if !c.SimpleConfig.Empty() {
-		o.applyDirConfigToPath(relPathDir, nil, &c.SimpleConfig)
+		o.applyDirConfigToPath(relPathDir, &c.SimpleConfig)
 	}
 	return nil
 }
@@ -145,13 +141,9 @@ func (o *RepoOwnerInfo) findOwnersForFile(path string, getValue func(*Config) []
 	}
 
 	for ; d != baseDirConvention; d = canonicalize(filepath.Dir(d)) {
-		if m, ok := o.dirOwners[d]; ok {
-			// TODO: m[(*regexp.Regexp)(nil)]
-			if s, ok := m[nil]; ok {
-				if s.Options.NoParentOwners || len(getValue(&s.Config)) > 0 {
-					return d
-				}
-
+		if s, ok := o.dirOwners[d]; ok {
+			if s.Options.NoParentOwners || len(getValue(&s.Config)) > 0 {
+				return d
 			}
 		}
 	}
@@ -184,11 +176,8 @@ func (o *RepoOwnerInfo) FindLabelsForFile(path string) sets.String {
 
 // IsNoParentOwners checks if an OWNERS file path refers to an OWNERS file with NoParentOwners enabled.
 func (o *RepoOwnerInfo) IsNoParentOwners(path string) bool {
-	if m, ok := o.dirOwners[path]; ok {
-		// TODO: m[(*regexp.Regexp)(nil)]
-		if s, ok := m[nil]; ok {
-			return s.Options.NoParentOwners
-		}
+	if s, ok := o.dirOwners[path]; ok {
+		return s.Options.NoParentOwners
 	}
 	return false
 }
@@ -210,14 +199,11 @@ func (o *RepoOwnerInfo) entriesForFile(path string, leafOnly bool, getValue func
 
 	out := sets.NewString()
 	for {
-		if m, ok := o.dirOwners[d]; ok {
-			// TODO: m[(*regexp.Regexp)(nil)]
-			if s, ok := m[nil]; ok {
-				out.Insert(getValue(&s.Config)...)
+		if s, ok := o.dirOwners[d]; ok {
+			out.Insert(getValue(&s.Config)...)
 
-				if s.Options.NoParentOwners {
-					break
-				}
+			if s.Options.NoParentOwners {
+				break
 			}
 		}
 
@@ -290,17 +276,15 @@ func (o *RepoOwnerInfo) TopLevelApprovers() sets.String {
 func (o *RepoOwnerInfo) AllReviewers() sets.String {
 	r := sets.NewString()
 
-	for _, v := range o.dirOwners {
-		for _, v1 := range v {
-			r.Insert(v1.Approvers...)
-			r.Insert(v1.Reviewers...)
-		}
+	for _, s := range o.dirOwners {
+		r.Insert(s.Approvers...)
+		r.Insert(s.Reviewers...)
 	}
 
 	for _, v := range o.fileOwners {
-		for _, v1 := range v {
-			r.Insert(v1.Approvers...)
-			r.Insert(v1.Reviewers...)
+		for _, s := range v {
+			r.Insert(s.Approvers...)
+			r.Insert(s.Reviewers...)
 		}
 	}
 
@@ -330,7 +314,7 @@ func (o *RepoOwnerInfo) ParseFullConfig(path string) (FullConfig, error) {
 
 func loadOwners(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (RepoOwner, error) {
 	o := &RepoOwnerInfo{
-		dirOwners:    make(map[string]map[*regexp.Regexp]SimpleConfig),
+		dirOwners:    make(map[string]SimpleConfig),
 		fileOwners:   make(map[string]map[*regexp.Regexp]Config),
 		baseDir:      baseDir,
 		dirBlacklist: dirBlacklist,
