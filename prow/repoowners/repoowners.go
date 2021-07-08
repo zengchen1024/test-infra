@@ -125,11 +125,11 @@ func (c *cache) setEntry(key string, data cacheEntry) {
 type cacheEntry struct {
 	sha     string
 	aliases RepoAliases
-	owners  *RepoOwners
+	owners  RepoOwner
 }
 
 func (entry cacheEntry) matchesMDYAML(mdYAML bool) bool {
-	return entry.owners.enableMDYAML == mdYAML
+	return entry.owners.isEnableMDYAML() == mdYAML
 }
 
 func (entry cacheEntry) fullyLoaded() bool {
@@ -224,6 +224,8 @@ type RepoOwner interface {
 	ParseSimpleConfig(path string) (SimpleConfig, error)
 	ParseFullConfig(path string) (FullConfig, error)
 	TopLevelApprovers() sets.String
+	filterCollaborators(toKeep []github.User) RepoOwner
+	isEnableMDYAML() bool
 }
 
 var _ RepoOwner = &RepoOwners{}
@@ -306,7 +308,7 @@ func (c *Client) LoadRepoOwners(org, repo, base string) (RepoOwner, error) {
 	}
 	log.WithField("duration", time.Since(start).String()).Debugf("Completed c.skipCollaborators(%s, %s)", org, repo)
 
-	var owners *RepoOwners
+	var owners RepoOwner
 	// Filter collaborators. We must filter the RepoOwners struct even if it came from the cache
 	// because the list of collaborators could have changed without the git SHA changing.
 	start = time.Now()
@@ -392,7 +394,7 @@ func (c *Client) cacheEntryFor(org, repo, base, cloneRef, fullName, sha string, 
 			log.WithField("duration", time.Since(start).String()).Debugf("Completed dirBlacklist loading")
 
 			start = time.Now()
-			entry.owners, err = loadOwnersFrom(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
+			entry.owners, err = loadOwners(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
 			if err != nil {
 				return cacheEntry{}, fmt.Errorf("failed to load RepoOwners for %s: %v", fullName, err)
 			}
@@ -716,7 +718,7 @@ func (o *RepoOwners) applyOptionsToPath(path string, opts dirOptions) {
 	}
 }
 
-func (o *RepoOwners) filterCollaborators(toKeep []github.User) *RepoOwners {
+func (o *RepoOwners) filterCollaborators(toKeep []github.User) RepoOwner {
 	collabs := sets.NewString()
 	for _, keeper := range toKeep {
 		collabs.Insert(github.NormLogin(keeper.Login))
@@ -893,4 +895,8 @@ func NewRepoOwners(p []string, log *logrus.Entry) RepoOwner {
 			canonicalize("."): {nil: sets.NewString(p...)},
 		},
 	}
+}
+
+func (o *RepoOwners) isEnableMDYAML() bool {
+	return o.enableMDYAML
 }
