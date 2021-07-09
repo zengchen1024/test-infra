@@ -55,6 +55,10 @@ type Config struct {
 	Labels            []string `json:"labels,omitempty"`
 }
 
+func (c Config) empty() bool {
+	return len(c.Approvers) == 0 && len(c.Reviewers) == 0 && len(c.RequiredReviewers) == 0 && len(c.Labels) == 0
+}
+
 // SimpleConfig holds options and Config applied to everything under the containing directory
 type SimpleConfig struct {
 	Options dirOptions `json:"options,omitempty"`
@@ -63,7 +67,7 @@ type SimpleConfig struct {
 
 // Empty checks if a SimpleConfig could be considered empty
 func (s *SimpleConfig) Empty() bool {
-	return len(s.Approvers) == 0 && len(s.Reviewers) == 0 && len(s.RequiredReviewers) == 0 && len(s.Labels) == 0
+	return s.Config.empty()
 }
 
 // FullConfig contains Filters which apply specific Config to files matching its regexp
