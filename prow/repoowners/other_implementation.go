@@ -123,9 +123,8 @@ func (o *RepoOwnerInfo) walkFunc(path string, info os.FileInfo, err error) error
 	}
 
 	// if path is in a blacklisted directory, ignore it
-	dir := filepath.Dir(path)
 	for _, re := range o.dirBlacklist {
-		if re.MatchString(dir) {
+		if re.MatchString(relPathDir) {
 			return filepath.SkipDir
 		}
 	}
@@ -137,8 +136,8 @@ func (o *RepoOwnerInfo) walkFunc(path string, info os.FileInfo, err error) error
 }
 
 // findOwnersForFile returns the OWNERS file path furthest down the tree for a specified file
-func (o *RepoOwnerInfo) findOwnersForFile(path string, getValue func(*Config) []string) string {
-	//TODO: is it a bug for original
+// The path variable should be a full path to a filename
+func (o *RepoOwnerInfo) findOwnersForFile(path string, getValue getConfigItem) string {
 	d := canonicalize(filepath.Dir(path))
 
 	if fo, ok := o.fileOwners[d]; ok {
@@ -189,13 +188,11 @@ func (o *RepoOwnerInfo) IsNoParentOwners(path string) bool {
 	return o.dirOwners[path].Options.NoParentOwners
 }
 
-// entriesForFile returns a set of users who are assignees to the
-// requested file. The path variable should be a full path to a filename
-// and not directory as the final directory will be discounted if enableMDYAML is true
+// entriesForFile returns a set of users who are assignees to the requested file.
+// The path variable should be a full path to a filename.
 // leafOnly indicates whether only the OWNERS deepest in the tree (closest to the file)
-// should be returned or if all OWNERS in filepath should be returned
+// should be returned or if all OWNERS in filepath should be returned.
 func (o *RepoOwnerInfo) entriesForFile(path string, leafOnly bool, getValue getConfigItem) sets.String {
-	//TODO: is it a bug for original
 	d := canonicalize(filepath.Dir(path))
 
 	if fo, ok := o.fileOwners[d]; ok {
@@ -206,7 +203,7 @@ func (o *RepoOwnerInfo) entriesForFile(path string, leafOnly bool, getValue getC
 
 	out := sets.NewString()
 
-	for ; d != baseDirConvention; d = canonicalize(filepath.Dir(d)) {
+	for {
 		if s, ok := o.dirOwners[d]; ok {
 			out.Insert(getValue(&s.Config)...)
 
@@ -214,6 +211,10 @@ func (o *RepoOwnerInfo) entriesForFile(path string, leafOnly bool, getValue getC
 				break
 			}
 		}
+		if d == baseDirConvention {
+			break
+		}
+		d = canonicalize(filepath.Dir(d))
 	}
 	return out
 }
