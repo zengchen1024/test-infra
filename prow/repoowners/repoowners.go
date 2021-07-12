@@ -166,6 +166,8 @@ type delegate struct {
 	skipCollaborators  func(org, repo string) bool
 	ownersDirBlacklist func() prowConf.OwnersDirBlacklist
 
+	loadOwnersFunc func(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (RepoOwner, error)
+
 	cache *cache
 }
 
@@ -206,6 +208,7 @@ func NewClient(
 			mdYAMLEnabled:      mdYAMLEnabled,
 			skipCollaborators:  skipCollaborators,
 			ownersDirBlacklist: ownersDirBlacklist,
+			loadOwnersFunc:     loadOwners,
 		},
 	}
 }
@@ -398,7 +401,7 @@ func (c *Client) cacheEntryFor(org, repo, base, cloneRef, fullName, sha string, 
 			log.WithField("duration", time.Since(start).String()).Debugf("Completed dirBlacklist loading")
 
 			start = time.Now()
-			entry.owners, err = loadOwners(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
+			entry.owners, err = c.loadOwnersFunc(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
 			if err != nil {
 				return cacheEntry{}, fmt.Errorf("failed to load RepoOwners for %s: %v", fullName, err)
 			}
@@ -466,7 +469,7 @@ func loadAliasesFrom(baseDir string, log *logrus.Entry) RepoAliases {
 	return result
 }
 
-func loadOwnersFrom(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (*RepoOwners, error) {
+func loadOwnersFrom(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (RepoOwner, error) {
 	o := &RepoOwners{
 		RepoAliases:  aliases,
 		baseDir:      baseDir,

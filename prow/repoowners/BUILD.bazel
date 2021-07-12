@@ -20,7 +20,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["repoowners_test.go"],
+    srcs = [
+      "repoowners_test.go",
+      "other_implementation_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//prow/config:go_default_library",
