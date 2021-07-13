@@ -38,8 +38,8 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	if ah.numberOfApprovers == 1 {
 		ap := approvers.NewApprovers(owner)
-		ap.AddAssignees(assignees1.List()...)
-		ap.AddApprovers(currentApprovers1.List())
+		ap.AddAssignees(assignees1.UnsortedList()...)
+		ap.AddApprovers(currentApprovers1.UnsortedList())
 		return ap.GetCCs()
 	}
 
@@ -65,7 +65,7 @@ func (ah approverHelper) suggestApprovers() []string {
 		}
 	}
 	keepAssignees := ah.keepCoveringApprovers(
-		owner, fullReverseMap, approversAndSuggested, everyone.List(),
+		owner, fullReverseMap, approversAndSuggested, everyone.UnsortedList(),
 	)
 
 	return suggested.Union(keepAssignees).List()
@@ -109,7 +109,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		}
 
 		keptApprovers := sets.NewString()
-		for _, suggestedApprover := range owner.GetSuggestedApprovers(reverseMap, candidates).List() {
+		for suggestedApprover := range owner.GetSuggestedApprovers(reverseMap, candidates) {
 			if reverseMap[suggestedApprover].Intersection(unapproved).Len() != 0 {
 				keptApprovers.Insert(suggestedApprover)
 			}
@@ -119,7 +119,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 	}
 
 	ap := approvers.NewApprovers(owner)
-	ap.AddApprovers(knownApprovers.List())
+	ap.AddApprovers(knownApprovers.UnsortedList())
 
 	r := sets.NewString()
 	for i := 0; i < numberOfApprovers; i++ {
@@ -129,8 +129,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		}
 
 		r = r.Union(v)
-
-		ap.AddApprovers(v.List())
+		ap.AddApprovers(v.UnsortedList())
 	}
 
 	return r

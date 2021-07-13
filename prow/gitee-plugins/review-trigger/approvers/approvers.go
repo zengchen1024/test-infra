@@ -64,7 +64,7 @@ func (ap Approvers) GetCCs() []string {
 	approversAndSuggested := currentApprovers.Union(suggested)
 	everyone := approversAndSuggested.Union(ap.assignees)
 	fullReverseMap := GetReverseMap(ap.owners.GetApprovers())
-	keepAssignees := ap.owners.KeepCoveringApprovers(fullReverseMap, approversAndSuggested, everyone.List())
+	keepAssignees := ap.owners.KeepCoveringApprovers(fullReverseMap, approversAndSuggested, everyone.UnsortedList())
 
 	return suggested.Union(keepAssignees).List()
 }

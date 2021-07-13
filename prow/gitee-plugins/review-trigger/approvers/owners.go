@@ -18,7 +18,6 @@ package approvers
 
 import (
 	"math/rand"
-	"sort"
 
 	"github.com/sirupsen/logrus"
 
@@ -65,24 +64,23 @@ func (o Owners) GetLeafApprovers() map[string]sets.String {
 
 // GetAllPotentialApprovers returns the people from relevant owners files needed to get the PR approved
 func (o Owners) GetAllPotentialApprovers() []string {
-	approversOnly := []string{}
+	approversOnly := sets.NewString()
 	for _, approverList := range o.GetLeafApprovers() {
-		approversOnly = append(approversOnly, approverList.List()...)
+		approversOnly = approversOnly.Union(approverList)
 	}
 
-	if len(approversOnly) == 0 {
+	if approversOnly.Len() == 0 {
 		o.log.Warn("No potential approvers exist. Does the repo have OWNERS files?")
 	}
 
-	sort.Strings(approversOnly)
-	return approversOnly
+	return approversOnly.List()
 }
 
 // temporaryUnapprovedFiles returns the list of files that wouldn't be
 // approved by the given set of approvers.
 func (o Owners) temporaryUnapprovedFiles(approvers sets.String) sets.String {
 	ap := NewApprovers(o)
-	ap.AddApprovers(approvers.List())
+	ap.AddApprovers(approvers.UnsortedList())
 	return ap.UnapprovedFiles()
 }
 
@@ -96,7 +94,7 @@ func (o Owners) KeepCoveringApprovers(reverseMap map[string]sets.String, knownAp
 	unapproved := o.temporaryUnapprovedFiles(knownApprovers)
 
 	keptApprovers := sets.NewString()
-	for _, suggestedApprover := range o.GetSuggestedApprovers(reverseMap, potentialApprovers).List() {
+	for suggestedApprover := range o.GetSuggestedApprovers(reverseMap, potentialApprovers) {
 		if reverseMap[suggestedApprover].Intersection(unapproved).Len() != 0 {
 			keptApprovers.Insert(suggestedApprover)
 		}
@@ -124,7 +122,7 @@ func (o Owners) GetSuggestedApprovers(reverseMap map[string]sets.String, potenti
 	for !ap.RequirementsMet() {
 		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, ap.UnapprovedFiles())
 		if newApprover == "" {
-			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.UnapprovedFiles().List())
+			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.UnapprovedFiles().UnsortedList())
 			return ap.GetCurrentApproversSet()
 		}
 		ap.AddApprover(newApprover)
