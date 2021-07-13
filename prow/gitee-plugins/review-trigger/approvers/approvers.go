@@ -1,3 +1,19 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package approvers
 
 import (
@@ -90,19 +106,13 @@ func (ap Approvers) GetCurrentApproversSetCased() sets.String {
 }
 
 // AreFilesApproved returns a bool indicating whether or not OWNERS files associated with
-// the PR are approved.  A PR with no OWNERS files is not considered approved. If this
-// returns true, the PR may still not be fully approved depending on the associated issue
-// requirement
+// the PR are approved.  A PR with no OWNERS files is not considered approved.
 func (ap Approvers) AreFilesApproved() bool {
 	return len(ap.owners.filenames) != 0 && ap.UnapprovedFiles().Len() == 0
 }
 
 // RequirementsMet returns a bool indicating whether the PR has met all approval requirements:
 // - all OWNERS files associated with the PR have been approved AND
-// EITHER
-// 	- the munger config is such that an issue is not required to be associated with the PR
-// 	- that there is an associated issue with the PR
-// 	- an OWNER has indicated that the PR is trivial enough that an issue need not be associated with the PR
 func (ap Approvers) RequirementsMet() bool {
 	return ap.AreFilesApproved()
 }

@@ -50,22 +50,18 @@ type Owners struct {
 // GetApprovers returns a map from ownersFiles -> people that are approvers in them
 func (o Owners) GetApprovers() map[string]sets.String {
 	ownersToApprovers := map[string]sets.String{}
-
 	for _, fn := range o.filenames {
 		ownersToApprovers[fn] = o.repo.Approvers(fn)
 	}
-
 	return ownersToApprovers
 }
 
 // GetLeafApprovers returns a map from ownersFiles -> people that are approvers in them (only the leaf)
 func (o Owners) GetLeafApprovers() map[string]sets.String {
 	ownersToApprovers := map[string]sets.String{}
-
 	for _, fn := range o.filenames {
 		ownersToApprovers[fn] = o.repo.LeafApprovers(fn)
 	}
-
 	return ownersToApprovers
 }
 
