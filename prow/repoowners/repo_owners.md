@@ -20,16 +20,14 @@ files:
     - elvis
 ```
 
-### Directory Owners
-Directory Owners is Part One defined in a OWNERS file which means the approvers and reviewers will be found from it for any files except the ones defined in Part Two in the directory. 
+### Directory Owners (Part One)
+Directory Owners defines the approvers and reviewers for any files in a directory except the ones defined in Part Two of OWNERS file
 
-Note:
+It will find approvers and reviewers from OWNERS file of current and parent directories by default, excpet the `no_parent_owners` is set as true.
 
-If `no_parent_owners` is true, then it will not retrieve the approvers or reviewers from parent directories when the Part One defined approvers and reviewers correspondingly.
+If `no_parent_owners` is true, then it will not retrieve the approvers or reviewers from parent directories when the Part One defines them correspondingly.
 
-However, for the following OWNERS file, it will only find approvers from current directory, but for reviewers it will not.
-
-Because there is not reviewers in OWNERS file, and the `no_parent_owenrs` is unactive to retrieve reviewers.
+However, for the following OWNERS file, it will only find approvers from current directory, but for reviewers it will not, because reviewers is undefined.
 
 ```yaml
 approvers:
@@ -38,13 +36,13 @@ options:
   no_parent_owners: true
 ```
 
-### File Owners
-It can defines speeical approvers or reviewers for some files in a directory.
+### File Owners (Part Two)
+It can defines special approvers or reviewers for some files in a directory in Part Two of OWNERS file.
 
-If the file name matches to the key defined in `files` in Part Two, then it will find approvers and reviewers from it.
+If the file name matches to the key defined in `files`, then it will find approvers and reviewers from it.
 
-Note: 
+If the file name matches the key but approvers or reviewers are not defined, it will find them from Part One of OWNERS file in current and parent directories.
 
-There is not `no_parent_owners` field in Part Two, because this part is for special files.
+**Note**:
 
-If the file name matches the key but approvers or reviewers are not defined, it will also find them from current and parent directories.
+There is not `no_parent_owners` field in Part Two, because this part is for special files and parent OWNERS files are ignored by default.
