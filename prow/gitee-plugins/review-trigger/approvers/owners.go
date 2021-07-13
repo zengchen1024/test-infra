@@ -79,9 +79,8 @@ func (o Owners) GetAllPotentialApprovers() []string {
 // temporaryUnapprovedFiles returns the list of files that wouldn't be
 // approved by the given set of approvers.
 func (o Owners) temporaryUnapprovedFiles(approvers sets.String) sets.String {
-	ap := NewApprovers(o)
-	ap.AddApprovers(approvers.UnsortedList())
-	return ap.UnapprovedFiles()
+	ap := newApproversHelper(o, approvers.UnsortedList())
+	return ap.unapprovedFiles()
 }
 
 // KeepCoveringApprovers finds who we should keep as suggested approvers given a pre-selection
@@ -118,16 +117,16 @@ func findMostCoveringApprover(allApprovers []string, reverseMap map[string]sets.
 // GetSuggestedApprovers solves the exact cover problem, finding an approver capable of
 // approving every OWNERS file in the PR
 func (o Owners) GetSuggestedApprovers(reverseMap map[string]sets.String, potentialApprovers []string) sets.String {
-	ap := NewApprovers(o)
-	for !ap.RequirementsMet() {
-		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, ap.UnapprovedFiles())
+	ap := newApproversHelper(o, nil)
+	for !ap.requirementsMet() {
+		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, ap.unapprovedFiles())
 		if newApprover == "" {
-			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.UnapprovedFiles().UnsortedList())
-			return ap.GetCurrentApproversSet()
+			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.unapprovedFiles().UnsortedList())
+			return ap.getCurrentApproversSet()
 		}
-		ap.AddApprover(newApprover)
+		ap.addApprover(newApprover)
 	}
-	return ap.GetCurrentApproversSet()
+	return ap.getCurrentApproversSet()
 }
 
 // GetShuffledApprovers shuffles the potential approvers so that we don't

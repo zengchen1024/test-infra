@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "approvers.go",
+        "approvers_helper.go",
         "owners.go",
     ],
     importpath = "k8s.io/test-infra/prow/gitee-plugins/review-trigger/approvers",
