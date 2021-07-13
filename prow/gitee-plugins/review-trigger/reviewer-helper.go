@@ -57,14 +57,7 @@ func (r reviewerHelper) suggestReviewers() ([]string, error) {
 
 func (r reviewerHelper) getReviewers(rc reviewersClient, files []string, minReviewers int, excludedReviewers sets.String) []string {
 	leafReviewers := sets.NewString()
-	ownersSeen := sets.NewString()
 	for _, filename := range files {
-		ownersFile := rc.FindReviewersOwnersForFile(filename)
-		if ownersSeen.Has(ownersFile) {
-			continue
-		}
-		ownersSeen.Insert(ownersFile)
-
 		v := rc.LeafReviewers(filename).Difference(excludedReviewers)
 		if v.Len() > 0 {
 			leafReviewers = leafReviewers.Union(v)
@@ -106,24 +99,18 @@ func popRandom(set *sets.String) string {
 	return sel
 }
 
-// findReviewer finds a reviewer from a set, potentially using status
-// availability.
+// findReviewer finds a reviewer from a set randomly.
 func findReviewer(targetSet *sets.String) string {
 	return popRandom(targetSet)
 }
 
 type reviewersClient interface {
-	FindReviewersOwnersForFile(path string) string
 	Reviewers(path string) sets.String
 	LeafReviewers(path string) sets.String
 }
 
 type fallbackReviewersClient struct {
 	oc repoowners.RepoOwner
-}
-
-func (foc fallbackReviewersClient) FindReviewersOwnersForFile(path string) string {
-	return foc.oc.FindApproverOwnersForFile(path)
 }
 
 func (foc fallbackReviewersClient) Reviewers(path string) sets.String {
