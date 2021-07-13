@@ -39,9 +39,7 @@ func (ah approverHelper) suggestApprovers() []string {
 	if ah.numberOfApprovers == 1 {
 		ap := approvers.NewApprovers(owner)
 		ap.AddAssignees(assignees1.List()...)
-		for item := range currentApprovers1 {
-			ap.AddApprover(item, "", false)
-		}
+		ap.AddApprovers(currentApprovers1.List())
 		return ap.GetCCs()
 	}
 
@@ -121,9 +119,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 	}
 
 	ap := approvers.NewApprovers(owner)
-	for k := range knownApprovers {
-		ap.AddApprover(k, "", false)
-	}
+	ap.AddApprovers(knownApprovers.List())
 
 	r := sets.NewString()
 	for i := 0; i < numberOfApprovers; i++ {
@@ -134,9 +130,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 
 		r = r.Union(v)
 
-		for k := range v {
-			ap.AddApprover(k, "", false)
-		}
+		ap.AddApprovers(v.List())
 	}
 
 	return r

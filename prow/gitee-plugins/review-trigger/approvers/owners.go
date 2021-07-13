@@ -29,8 +29,6 @@ import (
 type Repo interface {
 	Approvers(path string) sets.String
 	LeafApprovers(path string) sets.String
-	FindApproverOwnersForFile(file string) string
-	IsNoParentOwners(path string) bool
 }
 
 // NewOwners consturcts a new Owners instance. filenames is the slice of files changed.
@@ -72,12 +70,11 @@ func (o Owners) GetAllPotentialApprovers() []string {
 		approversOnly = append(approversOnly, approverList.List()...)
 	}
 
-	sort.Strings(approversOnly)
-
 	if len(approversOnly) == 0 {
 		o.log.Warn("No potential approvers exist. Does the repo have OWNERS files?")
 	}
 
+	sort.Strings(approversOnly)
 	return approversOnly
 }
 
@@ -85,9 +82,7 @@ func (o Owners) GetAllPotentialApprovers() []string {
 // approved by the given set of approvers.
 func (o Owners) temporaryUnapprovedFiles(approvers sets.String) sets.String {
 	ap := NewApprovers(o)
-	for approver := range approvers {
-		ap.AddApprover(approver, "", false)
-	}
+	ap.AddApprovers(approvers.List())
 	return ap.UnapprovedFiles()
 }
 
@@ -97,16 +92,15 @@ func (o Owners) KeepCoveringApprovers(reverseMap map[string]sets.String, knownAp
 	if len(potentialApprovers) == 0 {
 		o.log.Debug("No potential approvers exist to filter for relevance. Does this repo have OWNERS files?")
 	}
-	keptApprovers := sets.NewString()
 
 	unapproved := o.temporaryUnapprovedFiles(knownApprovers)
 
+	keptApprovers := sets.NewString()
 	for _, suggestedApprover := range o.GetSuggestedApprovers(reverseMap, potentialApprovers).List() {
 		if reverseMap[suggestedApprover].Intersection(unapproved).Len() != 0 {
 			keptApprovers.Insert(suggestedApprover)
 		}
 	}
-
 	return keptApprovers
 }
 
@@ -115,8 +109,8 @@ func findMostCoveringApprover(allApprovers []string, reverseMap map[string]sets.
 	var bestPerson string
 	for _, approver := range allApprovers {
 		filesCanApprove := reverseMap[approver]
-		if filesCanApprove.Intersection(unapproved).Len() > maxCovered {
-			maxCovered = len(filesCanApprove)
+		if n := filesCanApprove.Intersection(unapproved).Len(); n > maxCovered {
+			maxCovered = n
 			bestPerson = approver
 		}
 	}
@@ -133,9 +127,8 @@ func (o Owners) GetSuggestedApprovers(reverseMap map[string]sets.String, potenti
 			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.UnapprovedFiles().List())
 			return ap.GetCurrentApproversSet()
 		}
-		ap.AddApprover(newApprover, "", false)
+		ap.AddApprover(newApprover)
 	}
-
 	return ap.GetCurrentApproversSet()
 }
 

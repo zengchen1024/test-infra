@@ -75,15 +75,20 @@ func (ap Approvers) GetCurrentApproversSet() sets.String {
 }
 
 // AddApprover adds a new Approver
-func (ap *Approvers) AddApprover(login, reference string, noIssue bool) {
+func (ap *Approvers) AddApprover(login string) {
 	ap.approvers.Insert(login)
+}
+
+// AddApprovers adds approvers
+func (ap *Approvers) AddApprovers(login []string) {
+	ap.approvers.Insert(login...)
 }
 
 // UnapprovedFiles returns owners files that still need approval
 func (ap Approvers) UnapprovedFiles() sets.String {
 	unapproved := sets.NewString()
 	for fn, approvers := range ap.GetFilesApprovers() {
-		if len(approvers) == 0 {
+		if approvers.Len() == 0 {
 			unapproved.Insert(fn)
 		}
 	}
@@ -92,8 +97,9 @@ func (ap Approvers) UnapprovedFiles() sets.String {
 
 // GetFilesApprovers returns a map from files -> list of current approvers.
 func (ap Approvers) GetFilesApprovers() map[string]sets.String {
-	filesApprovers := map[string]sets.String{}
 	currentApprovers := ap.GetCurrentApproversSetCased()
+
+	filesApprovers := map[string]sets.String{}
 	for fn, potentialApprovers := range ap.owners.GetApprovers() {
 		filesApprovers[fn] = currentApprovers.Intersection(potentialApprovers)
 	}
