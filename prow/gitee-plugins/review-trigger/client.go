@@ -1,7 +1,6 @@
 package reviewtrigger
 
 import (
-	"path/filepath"
 	"time"
 
 	sdk "gitee.com/openeuler/go-gitee/gitee"
@@ -55,15 +54,9 @@ func (c ghclient) getPullRequestChanges(org, repo string, number int) ([]string,
 		return nil, err
 	}
 
-	m := map[string]bool{}
 	r := make([]string, 0, len(filenames))
 	for i := range filenames {
-		filename := filenames[i].Filename
-		dir := filepath.Dir(filename)
-		if !m[dir] {
-			m[dir] = true
-			r = append(r, filename)
-		}
+		r = append(r, filenames[i].Filename)
 	}
 	return r, nil
 }

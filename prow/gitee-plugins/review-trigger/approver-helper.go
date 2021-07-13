@@ -4,7 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"k8s.io/test-infra/prow/plugins/approve/approvers"
+	"k8s.io/test-infra/prow/gitee-plugins/review-trigger/approvers"
 )
 
 type approverHelper struct {
@@ -47,7 +47,7 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	approversAndAssignees := currentApprovers1.Union(assignees1)
 	randomizedApprovers := owner.GetShuffledApprovers()
-	leafReverseMap := owner.GetReverseMap(owner.GetLeafApprovers())
+	leafReverseMap := approvers.GetReverseMap(owner.GetLeafApprovers())
 	if dontAllowSelfApprove {
 		if _, ok := leafReverseMap[prAuthor]; ok {
 			delete(leafReverseMap, prAuthor)
@@ -60,7 +60,7 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	approversAndSuggested := currentApprovers1.Union(suggested)
 	everyone := approversAndSuggested.Union(assignees1)
-	fullReverseMap := owner.GetReverseMap(owner.GetApprovers())
+	fullReverseMap := approvers.GetReverseMap(owner.GetApprovers())
 	if dontAllowSelfApprove {
 		if _, ok := fullReverseMap[prAuthor]; ok {
 			delete(fullReverseMap, prAuthor)
