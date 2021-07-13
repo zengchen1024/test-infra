@@ -55,6 +55,10 @@ type Config struct {
 	Labels            []string `json:"labels,omitempty"`
 }
 
+func (c Config) empty() bool {
+	return len(c.Approvers) == 0 && len(c.Reviewers) == 0 && len(c.RequiredReviewers) == 0 && len(c.Labels) == 0
+}
+
 // SimpleConfig holds options and Config applied to everything under the containing directory
 type SimpleConfig struct {
 	Options dirOptions `json:"options,omitempty"`
@@ -63,7 +67,7 @@ type SimpleConfig struct {
 
 // Empty checks if a SimpleConfig could be considered empty
 func (s *SimpleConfig) Empty() bool {
-	return len(s.Approvers) == 0 && len(s.Reviewers) == 0 && len(s.RequiredReviewers) == 0 && len(s.Labels) == 0
+	return s.Config.empty()
 }
 
 // FullConfig contains Filters which apply specific Config to files matching its regexp
@@ -125,11 +129,11 @@ func (c *cache) setEntry(key string, data cacheEntry) {
 type cacheEntry struct {
 	sha     string
 	aliases RepoAliases
-	owners  *RepoOwners
+	owners  RepoOwner
 }
 
 func (entry cacheEntry) matchesMDYAML(mdYAML bool) bool {
-	return entry.owners.enableMDYAML == mdYAML
+	return entry.owners.isEnableMDYAML() == mdYAML
 }
 
 func (entry cacheEntry) fullyLoaded() bool {
@@ -161,6 +165,8 @@ type delegate struct {
 	mdYAMLEnabled      func(org, repo string) bool
 	skipCollaborators  func(org, repo string) bool
 	ownersDirBlacklist func() prowConf.OwnersDirBlacklist
+
+	loadOwnersFunc func(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (RepoOwner, error)
 
 	cache *cache
 }
@@ -202,6 +208,7 @@ func NewClient(
 			mdYAMLEnabled:      mdYAMLEnabled,
 			skipCollaborators:  skipCollaborators,
 			ownersDirBlacklist: ownersDirBlacklist,
+			loadOwnersFunc:     loadOwners,
 		},
 	}
 }
@@ -224,6 +231,8 @@ type RepoOwner interface {
 	ParseSimpleConfig(path string) (SimpleConfig, error)
 	ParseFullConfig(path string) (FullConfig, error)
 	TopLevelApprovers() sets.String
+	filterCollaborators(toKeep []github.User) RepoOwner
+	isEnableMDYAML() bool
 }
 
 var _ RepoOwner = &RepoOwners{}
@@ -306,7 +315,7 @@ func (c *Client) LoadRepoOwners(org, repo, base string) (RepoOwner, error) {
 	}
 	log.WithField("duration", time.Since(start).String()).Debugf("Completed c.skipCollaborators(%s, %s)", org, repo)
 
-	var owners *RepoOwners
+	var owners RepoOwner
 	// Filter collaborators. We must filter the RepoOwners struct even if it came from the cache
 	// because the list of collaborators could have changed without the git SHA changing.
 	start = time.Now()
@@ -392,7 +401,7 @@ func (c *Client) cacheEntryFor(org, repo, base, cloneRef, fullName, sha string, 
 			log.WithField("duration", time.Since(start).String()).Debugf("Completed dirBlacklist loading")
 
 			start = time.Now()
-			entry.owners, err = loadOwnersFrom(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
+			entry.owners, err = c.loadOwnersFunc(gitRepo.Directory(), mdYaml, entry.aliases, dirBlacklist, log)
 			if err != nil {
 				return cacheEntry{}, fmt.Errorf("failed to load RepoOwners for %s: %v", fullName, err)
 			}
@@ -460,7 +469,7 @@ func loadAliasesFrom(baseDir string, log *logrus.Entry) RepoAliases {
 	return result
 }
 
-func loadOwnersFrom(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (*RepoOwners, error) {
+func loadOwnersFrom(baseDir string, mdYaml bool, aliases RepoAliases, dirBlacklist []*regexp.Regexp, log *logrus.Entry) (RepoOwner, error) {
 	o := &RepoOwners{
 		RepoAliases:  aliases,
 		baseDir:      baseDir,
@@ -716,7 +725,7 @@ func (o *RepoOwners) applyOptionsToPath(path string, opts dirOptions) {
 	}
 }
 
-func (o *RepoOwners) filterCollaborators(toKeep []github.User) *RepoOwners {
+func (o *RepoOwners) filterCollaborators(toKeep []github.User) RepoOwner {
 	collabs := sets.NewString()
 	for _, keeper := range toKeep {
 		collabs.Insert(github.NormLogin(keeper.Login))
@@ -893,4 +902,8 @@ func NewRepoOwners(p []string, log *logrus.Entry) RepoOwner {
 			canonicalize("."): {nil: sets.NewString(p...)},
 		},
 	}
+}
+
+func (o *RepoOwners) isEnableMDYAML() bool {
+	return o.enableMDYAML
 }

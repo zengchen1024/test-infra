@@ -196,9 +196,10 @@ func getTestClient(
 		if cacheOptions.hasAliases {
 			entry.aliases = make(map[string]sets.String)
 		}
-		entry.owners = &RepoOwners{
+		repoOwners := &RepoOwners{
 			enableMDYAML: cacheOptions.mdYaml,
 		}
+		entry.owners = repoOwners
 		if cacheOptions.commonFileChanged {
 			md := map[string][]byte{"common": []byte(`---
 This file could be anything
@@ -247,7 +248,7 @@ labels:
 		}
 		cache.data["org"+"/"+"repo:master"] = entry
 		// mark this entry is cache
-		entry.owners.baseDir = "cache"
+		repoOwners.baseDir = "cache"
 	}
 	ghc := &fakeGitHubClient{Collaborators: []string{"cjwagner", "k8s-ci-robot", "alice", "bob", "carl", "mml", "maggie"}}
 	ghc.ref, err = localGit.RevParse("org", "repo", "HEAD")
@@ -274,6 +275,7 @@ labels:
 						IgnorePreconfiguredDefaults: ignorePreconfiguredDefaults,
 					}
 				},
+				loadOwnersFunc: loadOwnersFrom,
 			},
 		},
 		// Clean up function
