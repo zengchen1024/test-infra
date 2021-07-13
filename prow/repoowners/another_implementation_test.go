@@ -76,6 +76,17 @@ files:
     - go_b
 `),
 
+		"src/dir/workers/OWNERS": []byte(`
+approvers:
+- workers_a
+reviewers:
+- workers_b
+files:
+  "\\.go$":
+    approvers:
+    - go_a
+`),
+
 		"src/dir/doc/OWNERS": []byte(`
 options:
   no_parent_owners: true
@@ -311,6 +322,30 @@ func genTestCaseOfRepoOwnerInfo() []testCaseOfRepoOwnerInfo {
 			expectedLeafReviewers:     sets.NewString("go_b"),
 			expectedApproverOwnerFile: "src/dir/subdir",
 			expectedReviewerOwnerFile: "src/dir/subdir",
+		},
+
+		{
+			name:                      "src/dir/subdir/agent/1.go",
+			path:                      "src/dir/subdir/agent/1.go",
+			topLevelApprovers:         sets.NewString("root_a"),
+			expectedApprovers:         sets.NewString("dir_a", "subdir_a"),
+			expectedReviewers:         sets.NewString("dir_b", "subdir_b"),
+			expectedLeafApprovers:     sets.NewString("subdir_a"),
+			expectedLeafReviewers:     sets.NewString("subdir_b"),
+			expectedApproverOwnerFile: "src/dir/subdir",
+			expectedReviewerOwnerFile: "src/dir/subdir",
+		},
+
+		{
+			name:                      "src/dir/workers/1.go",
+			path:                      "src/dir/workers/1.go",
+			topLevelApprovers:         sets.NewString("root_a"),
+			expectedApprovers:         sets.NewString("go_a"),
+			expectedReviewers:         sets.NewString("dir_b", "workers_b"),
+			expectedLeafApprovers:     sets.NewString("go_a"),
+			expectedLeafReviewers:     sets.NewString("workers_b"),
+			expectedApproverOwnerFile: "src/dir/workers",
+			expectedReviewerOwnerFile: "src/dir/workers",
 		},
 
 		{
