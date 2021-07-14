@@ -4,7 +4,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"k8s.io/test-infra/prow/plugins/approve/approvers"
+	"k8s.io/test-infra/prow/gitee-plugins/review-trigger/approvers"
 )
 
 type approverHelper struct {
@@ -38,16 +38,14 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	if ah.numberOfApprovers == 1 {
 		ap := approvers.NewApprovers(owner)
-		ap.AddAssignees(assignees1.List()...)
-		for item := range currentApprovers1 {
-			ap.AddApprover(item, "", false)
-		}
+		ap.AddAssignee(assignees1.UnsortedList()...)
+		ap.AddApprover(currentApprovers1.UnsortedList()...)
 		return ap.GetCCs()
 	}
 
 	approversAndAssignees := currentApprovers1.Union(assignees1)
 	randomizedApprovers := owner.GetShuffledApprovers()
-	leafReverseMap := owner.GetReverseMap(owner.GetLeafApprovers())
+	leafReverseMap := approvers.GetReverseMap(owner.GetLeafApprovers())
 	if dontAllowSelfApprove {
 		if _, ok := leafReverseMap[prAuthor]; ok {
 			delete(leafReverseMap, prAuthor)
@@ -60,14 +58,14 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	approversAndSuggested := currentApprovers1.Union(suggested)
 	everyone := approversAndSuggested.Union(assignees1)
-	fullReverseMap := owner.GetReverseMap(owner.GetApprovers())
+	fullReverseMap := approvers.GetReverseMap(owner.GetApprovers())
 	if dontAllowSelfApprove {
 		if _, ok := fullReverseMap[prAuthor]; ok {
 			delete(fullReverseMap, prAuthor)
 		}
 	}
 	keepAssignees := ah.keepCoveringApprovers(
-		owner, fullReverseMap, approversAndSuggested, everyone.List(),
+		owner, fullReverseMap, approversAndSuggested, everyone.UnsortedList(),
 	)
 
 	return suggested.Union(keepAssignees).List()
@@ -87,7 +85,7 @@ func removeSliceElement(v []string, target string) []string {
 func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMap map[string]sets.String, knownApprovers sets.String, potentialApprovers []string) sets.String {
 	numberOfApprovers := ah.numberOfApprovers
 
-	f := func(ap approvers.Approvers) sets.String {
+	f := func(ap *approvers.StaticApprovers) sets.String {
 		excludedApprovers := sets.String{}
 		unapproved := sets.String{}
 		files := ap.GetFilesApprovers()
@@ -111,7 +109,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		}
 
 		keptApprovers := sets.NewString()
-		for _, suggestedApprover := range owner.GetSuggestedApprovers(reverseMap, candidates).List() {
+		for suggestedApprover := range owner.GetSuggestedApprovers(reverseMap, candidates) {
 			if reverseMap[suggestedApprover].Intersection(unapproved).Len() != 0 {
 				keptApprovers.Insert(suggestedApprover)
 			}
@@ -120,10 +118,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		return keptApprovers
 	}
 
-	ap := approvers.NewApprovers(owner)
-	for k := range knownApprovers {
-		ap.AddApprover(k, "", false)
-	}
+	ap := approvers.NewStaticApprovers(owner, knownApprovers.UnsortedList())
 
 	r := sets.NewString()
 	for i := 0; i < numberOfApprovers; i++ {
@@ -133,10 +128,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		}
 
 		r = r.Union(v)
-
-		for k := range v {
-			ap.AddApprover(k, "", false)
-		}
+		ap.AddApprover(v.UnsortedList()...)
 	}
 
 	return r
