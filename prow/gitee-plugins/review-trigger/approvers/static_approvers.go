@@ -1,8 +1,6 @@
 package approvers
 
-import (
-	"k8s.io/apimachinery/pkg/util/sets"
-)
+import "k8s.io/apimachinery/pkg/util/sets"
 
 type StaticApprovers struct {
 	fileApprovers map[string]sets.String
@@ -18,10 +16,6 @@ func NewStaticApprovers(o Owners, as []string) *StaticApprovers {
 
 func (ap *StaticApprovers) AddApprover(as ...string) {
 	ap.approvers.Insert(as...)
-}
-
-func (ap StaticApprovers) requirementsMet() bool {
-	return len(ap.fileApprovers) > 0 && ap.unapprovedFiles().Len() == 0
 }
 
 func (ap StaticApprovers) unapprovedFiles() sets.String {

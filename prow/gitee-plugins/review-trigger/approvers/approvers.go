@@ -16,9 +16,7 @@ limitations under the License.
 
 package approvers
 
-import (
-	"k8s.io/apimachinery/pkg/util/sets"
-)
+import "k8s.io/apimachinery/pkg/util/sets"
 
 // NewApprovers create a new "Approvers" with no approval.
 func NewApprovers(owners Owners) Approvers {
@@ -75,8 +73,8 @@ func (ap Approvers) GetCurrentApproversSet() sets.String {
 }
 
 // AddApprover adds a new Approver
-func (ap *Approvers) AddApprover(login ...string) {
-	ap.approvers.Insert(login...)
+func (ap *Approvers) AddApprover(logins ...string) {
+	ap.approvers.Insert(logins...)
 }
 
 // AddAssignee adds assignees to the list

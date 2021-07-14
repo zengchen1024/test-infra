@@ -20,7 +20,6 @@ import (
 	"math/rand"
 
 	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -118,11 +117,16 @@ func findMostCoveringApprover(allApprovers []string, reverseMap map[string]sets.
 // approving every OWNERS file in the PR
 func (o Owners) GetSuggestedApprovers(reverseMap map[string]sets.String, potentialApprovers []string) sets.String {
 	ap := NewStaticApprovers(o, nil)
-	for !ap.requirementsMet() {
-		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, ap.unapprovedFiles())
+	for {
+		unapproved := ap.unapprovedFiles()
+		if unapproved.Len() == 0 {
+			break
+		}
+
+		newApprover := findMostCoveringApprover(potentialApprovers, reverseMap, unapproved)
 		if newApprover == "" {
 			o.log.Warnf("Couldn't find/suggest approvers for each files. Unapproved: %q", ap.unapprovedFiles().UnsortedList())
-			return ap.getCurrentApproversSet()
+			break
 		}
 		ap.AddApprover(newApprover)
 	}
