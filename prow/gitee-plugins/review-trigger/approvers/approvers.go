@@ -75,12 +75,7 @@ func (ap Approvers) GetCurrentApproversSet() sets.String {
 }
 
 // AddApprover adds a new Approver
-func (ap *Approvers) AddApprover(login string) {
-	ap.approvers.Insert(login)
-}
-
-// AddApprovers adds approvers
-func (ap *Approvers) AddApprovers(login []string) {
+func (ap *Approvers) AddApprover(login ...string) {
 	ap.approvers.Insert(login...)
 }
 
@@ -123,7 +118,7 @@ func (ap Approvers) RequirementsMet() bool {
 	return ap.AreFilesApproved()
 }
 
-// AddAssignees adds assignees to the list
-func (ap *Approvers) AddAssignees(logins ...string) {
+// AddAssignee adds assignees to the list
+func (ap *Approvers) AddAssignee(logins ...string) {
 	ap.assignees.Insert(logins...)
 }

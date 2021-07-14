@@ -38,8 +38,8 @@ func (ah approverHelper) suggestApprovers() []string {
 
 	if ah.numberOfApprovers == 1 {
 		ap := approvers.NewApprovers(owner)
-		ap.AddAssignees(assignees1.UnsortedList()...)
-		ap.AddApprovers(currentApprovers1.UnsortedList())
+		ap.AddAssignee(assignees1.UnsortedList()...)
+		ap.AddApprover(currentApprovers1.UnsortedList()...)
 		return ap.GetCCs()
 	}
 
@@ -85,7 +85,7 @@ func removeSliceElement(v []string, target string) []string {
 func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMap map[string]sets.String, knownApprovers sets.String, potentialApprovers []string) sets.String {
 	numberOfApprovers := ah.numberOfApprovers
 
-	f := func(ap approvers.Approvers) sets.String {
+	f := func(ap *approvers.StaticApprovers) sets.String {
 		excludedApprovers := sets.String{}
 		unapproved := sets.String{}
 		files := ap.GetFilesApprovers()
@@ -118,8 +118,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		return keptApprovers
 	}
 
-	ap := approvers.NewApprovers(owner)
-	ap.AddApprovers(knownApprovers.UnsortedList())
+	ap := approvers.NewStaticApprovers(owner, knownApprovers.UnsortedList())
 
 	r := sets.NewString()
 	for i := 0; i < numberOfApprovers; i++ {
@@ -129,7 +128,7 @@ func (ah approverHelper) keepCoveringApprovers(owner approvers.Owners, reverseMa
 		}
 
 		r = r.Union(v)
-		ap.AddApprovers(v.UnsortedList())
+		ap.AddApprover(v.UnsortedList()...)
 	}
 
 	return r
