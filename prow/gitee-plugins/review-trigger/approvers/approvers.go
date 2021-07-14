@@ -79,45 +79,6 @@ func (ap *Approvers) AddApprover(login ...string) {
 	ap.approvers.Insert(login...)
 }
 
-// UnapprovedFiles returns owners files that still need approval
-func (ap Approvers) UnapprovedFiles() sets.String {
-	unapproved := sets.NewString()
-	for fn, approvers := range ap.GetFilesApprovers() {
-		if approvers.Len() == 0 {
-			unapproved.Insert(fn)
-		}
-	}
-	return unapproved
-}
-
-// GetFilesApprovers returns a map from files -> list of current approvers.
-func (ap Approvers) GetFilesApprovers() map[string]sets.String {
-	currentApprovers := ap.GetCurrentApproversSetCased()
-
-	filesApprovers := map[string]sets.String{}
-	for fn, potentialApprovers := range ap.owners.GetApprovers() {
-		filesApprovers[fn] = currentApprovers.Intersection(potentialApprovers)
-	}
-	return filesApprovers
-}
-
-// GetCurrentApproversSetCased returns the set of approvers logins with the original cases.
-func (ap Approvers) GetCurrentApproversSetCased() sets.String {
-	return ap.approvers
-}
-
-// AreFilesApproved returns a bool indicating whether or not OWNERS files associated with
-// the PR are approved.  A PR with no OWNERS files is not considered approved.
-func (ap Approvers) AreFilesApproved() bool {
-	return len(ap.owners.filenames) != 0 && ap.UnapprovedFiles().Len() == 0
-}
-
-// RequirementsMet returns a bool indicating whether the PR has met all approval requirements:
-// - all OWNERS files associated with the PR have been approved AND
-func (ap Approvers) RequirementsMet() bool {
-	return ap.AreFilesApproved()
-}
-
 // AddAssignee adds assignees to the list
 func (ap *Approvers) AddAssignee(logins ...string) {
 	ap.assignees.Insert(logins...)
